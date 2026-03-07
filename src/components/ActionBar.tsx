@@ -1,7 +1,11 @@
 import { useGameStore } from '../store/gameStore'
 import { useUIStore } from '../store/uiStore'
 
-export default function ActionBar() {
+type Props = {
+  onCallDraw?: () => void
+}
+
+export default function ActionBar({ onCallDraw }: Props) {
   const game = useGameStore(s => s.game)
   const role = useUIStore(s => s.role)
   const hasDrawnThisTurn = useUIStore(s => s.hasDrawnThisTurn)
@@ -11,14 +15,25 @@ export default function ActionBar() {
   function promptLabel() {
     if (game.phase === 'ROUND_END') return 'ROUND OVER'
     if (game.phase === 'AI_TURN') return "AI's turn…"
-    if (isMyTurn && !hasDrawnThisTurn) return 'PICK A CARD'
-    if (isMyTurn && hasDrawnThisTurn) return 'SELECT A CARD TO DISCARD'
+    if (isMyTurn && !hasDrawnThisTurn) return 'PICK A CARD TO DRAW'
+    if (isMyTurn && hasDrawnThisTurn) return 'PLAY OR DISCARD'
     return `${game.currentTurn?.toUpperCase()}'s turn`
   }
 
   return (
-    <div className="w-full flex items-center justify-center py-1.5 bg-black/40">
+    <div className="w-full flex items-center justify-between px-4 py-1.5 bg-black/40">
+      <div className="w-24" />
       <span className="text-white text-xs font-bold tracking-widest">{promptLabel()}</span>
+      <div className="w-24 flex justify-end">
+        {onCallDraw && (
+          <button
+            onClick={onCallDraw}
+            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-white text-xs font-bold tracking-wide transition-colors"
+          >
+            CALL DRAW
+          </button>
+        )}
+      </div>
     </div>
   )
 }

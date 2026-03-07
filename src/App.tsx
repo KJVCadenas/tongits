@@ -11,5 +11,5 @@ export default function App() {
     return <Lobby peer={peer} />
   }
 
-  return <Board />
+  return <Board peer={peer} />
 }
