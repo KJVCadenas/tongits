@@ -5,9 +5,10 @@ type Props = {
   pile: CardType[]
   onClick?: () => void
   canDraw?: boolean
+  onViewHistory?: () => void
 }
 
-export default function DiscardPile({ pile, onClick, canDraw = false }: Props) {
+export default function DiscardPile({ pile, onClick, canDraw = false, onViewHistory }: Props) {
   const top = pile[0]
   return (
     <div className="flex flex-col items-center gap-1">
@@ -40,6 +41,19 @@ export default function DiscardPile({ pile, onClick, canDraw = false }: Props) {
         <span className="text-amber-400 text-xs font-bold tracking-wider">PICK</span>
       ) : (
         <span className="text-gray-600 text-xs">{pile.length}</span>
+      )}
+      {onViewHistory && (
+        <button
+          onClick={onViewHistory}
+          className="text-white/40 hover:text-white/80 transition-colors"
+          data-testid="btn-view-discard-history"
+          title="View discard history"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
       )}
     </div>
   )

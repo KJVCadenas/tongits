@@ -32,6 +32,7 @@ export type GameState = {
   discardPile: Card[]
   currentTurn: PlayerId
   hostIsDealer: boolean
+  dealerFirstTurn: boolean
   roundResult?: RoundResult
 }
 
@@ -92,6 +93,7 @@ export const initialGameState: GameState = {
   discardPile: [],
   currentTurn: 'host',
   hostIsDealer: true,
+  dealerFirstTurn: false,
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -103,17 +105,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const deck = shuffle(createDeck())
       const { dealerHand, player2Hand, aiHand, stock } = deal(deck)
       const dealer: PlayerId = state.hostIsDealer ? 'host' : 'guest'
+      const hostHand = dealer === 'host' ? dealerHand : player2Hand
+      const guestHand = dealer === 'guest' ? dealerHand : player2Hand
       return {
         ...state,
         phase: getPhaseForTurn(dealer),
         players: [
-          { id: 'host', hand: dealerHand, melds: [], isOpened: false },
-          { id: 'guest', hand: player2Hand, melds: [], isOpened: false },
+          { id: 'host', hand: hostHand, melds: [], isOpened: false },
+          { id: 'guest', hand: guestHand, melds: [], isOpened: false },
           { id: 'ai', hand: aiHand, melds: [], isOpened: false },
         ],
         stock,
         discardPile: [],
         currentTurn: dealer,
+        dealerFirstTurn: true,
         roundResult: undefined,
       }
     }
@@ -133,11 +138,28 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const player = state.players.find(p => p.id === state.currentTurn)
       if (!player) return state
       // Enforce: drawn card must participate in at least one valid meld
-      const possibleMelds = detectMelds([...player.hand, topCard])
-      if (!possibleMelds.some(m => m.some(c => c.id === topCard.id))) return state
+      const combinedHand = [...player.hand, topCard]
+      const possibleMelds = detectMelds(combinedHand)
+      const meldWithDrawn = possibleMelds.find(m => m.some(c => c.id === topCard.id))
+      if (!meldWithDrawn) return state
+      // Atomically lay the meld that contains the drawn card
+      const meldIds = new Set(meldWithDrawn.map(c => c.id))
+      const newHand = combinedHand.filter(c => !meldIds.has(c.id))
       const players = state.players.map(p =>
-        p.id === state.currentTurn ? { ...p, hand: [...p.hand, topCard] } : p
+        p.id === state.currentTurn
+          ? { ...p, hand: newHand, melds: [...p.melds, meldWithDrawn], isOpened: true }
+          : p
       )
+      // Tongit: hand empty after laying meld from discard
+      if (newHand.length === 0) {
+        return {
+          ...state,
+          players,
+          discardPile: remainingDiscard,
+          phase: 'ROUND_END',
+          roundResult: buildRoundResult(players, state.currentTurn, 'tongit'),
+        }
+      }
       return { ...state, players, discardPile: remainingDiscard }
     }
 
@@ -183,6 +205,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         discardPile: newDiscardPile,
         currentTurn: next,
         phase: getPhaseForTurn(next),
+        dealerFirstTurn: false,
       }
     }
 
@@ -289,18 +312,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const deck = shuffle(createDeck())
       const { dealerHand, player2Hand, aiHand, stock } = deal(deck)
       const dealer: PlayerId = newHostIsDealer ? 'host' : 'guest'
+      const hostHand = dealer === 'host' ? dealerHand : player2Hand
+      const guestHand = dealer === 'guest' ? dealerHand : player2Hand
       return {
         ...state,
         hostIsDealer: newHostIsDealer,
         phase: getPhaseForTurn(dealer),
         players: [
-          { id: 'host', hand: dealerHand, melds: [], isOpened: false },
-          { id: 'guest', hand: player2Hand, melds: [], isOpened: false },
+          { id: 'host', hand: hostHand, melds: [], isOpened: false },
+          { id: 'guest', hand: guestHand, melds: [], isOpened: false },
           { id: 'ai', hand: aiHand, melds: [], isOpened: false },
         ],
         stock,
         discardPile: [],
         currentTurn: dealer,
+        dealerFirstTurn: true,
         roundResult: undefined,
       }
     }

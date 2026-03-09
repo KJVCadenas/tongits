@@ -16,7 +16,7 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
   const addPendingMeld = useUIStore(s => s.addPendingMeld)
   const pendingMeldGroups = useUIStore(s => s.pendingMeldGroups)
   const selectedCardIds = useUIStore(s => s.selectedCardIds)
-  const hasDrawnThisTurn = useUIStore(s => s.hasDrawnThisTurn)
+  const hasDrawnThisTurn = useUIStore(s => s.hasDrawnThisTurn) || game.dealerFirstTurn
 
   // Guest routes through sendIntent; host/solo dispatches directly
   function sendAction(action: GameAction) {
@@ -89,20 +89,8 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
 
   function drawFromDiscard() {
     if (role !== game.currentTurn) return
-    const drawnCard = game.discardPile[game.discardPile.length - 1]
-    if (!drawnCard) return
     sendAction({ type: 'DRAW_FROM_DISCARD' })
     setHasDrawnThisTurn(true)
-
-    // Auto-lay any meld that contains the drawn card (Tongits rule)
-    const updatedGame = useGameStore.getState().game
-    const me = updatedGame.players.find(p => p.id === role)
-    if (!me) return
-    const melds = detectMelds(me.hand)
-    const meldsWithDrawn = melds.filter(m => m.some(c => c.id === drawnCard.id))
-    for (const meld of meldsWithDrawn) {
-      sendAction({ type: 'LAY_MELD', playerId: role, cardIds: meld.map(c => c.id) })
-    }
   }
 
   function discard(cardId: string) {

@@ -12,6 +12,10 @@ import MeldZone from './MeldZone'
 import DiscardPile from './DiscardPile'
 import StockPile from './StockPile'
 import ActionBar from './ActionBar'
+import CardComponent from './Card'
+
+const RANK_ORDER_DESC = ['K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', 'A'] as const
+const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' }
 
 type Props = {
   peer: ReturnType<typeof usePeer>
@@ -22,7 +26,9 @@ export default function Board({ peer }: Props) {
   const role = useUIStore(s => s.role)
   const selectedCardIds = useUIStore(s => s.selectedCardIds)
   const toggleCardSelection = useUIStore(s => s.toggleCardSelection)
-  const hasDrawnThisTurn = useUIStore(s => s.hasDrawnThisTurn)
+  const hasDrawnThisTurnRaw = useUIStore(s => s.hasDrawnThisTurn)
+  const [showDiscardHistory, setShowDiscardHistory] = useState(false)
+  const hasDrawnThisTurn = hasDrawnThisTurnRaw || game.dealerFirstTurn
 
   const {
     drawFromStock,
@@ -60,7 +66,7 @@ export default function Board({ peer }: Props) {
 
   const isMyTurn = game.currentTurn === myId
   const isActive = game.phase === 'PLAYER_TURN' || game.phase === 'AI_TURN'
-  const canDraw = isMyTurn && isActive && !hasDrawnThisTurn
+  const canDraw = isMyTurn && isActive && !hasDrawnThisTurnRaw && !game.dealerFirstTurn
 
   const pendingIds = new Set(pendingMeldGroups.flat())
   const hasSelectedPendingCard = selectedCardIds.some(id => pendingIds.has(id))
@@ -145,6 +151,7 @@ export default function Board({ peer }: Props) {
             pile={game.discardPile}
             onClick={canDraw && discardTopFormsMeld ? drawFromDiscard : undefined}
             canDraw={canDraw && discardTopFormsMeld}
+            onViewHistory={() => setShowDiscardHistory(true)}
           />
         </div>
 
@@ -214,6 +221,51 @@ export default function Board({ peer }: Props) {
           onSort={handleSort}
         />
       </div>
+
+      {/* ── Discard History modal ── */}
+      {showDiscardHistory && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+          onClick={() => setShowDiscardHistory(false)}
+        >
+          <div
+            className="bg-[#0a1f2b] rounded-2xl p-6 border border-white/20 flex flex-col gap-5 max-h-[90vh] overflow-y-auto min-w-96"
+            onClick={e => e.stopPropagation()}
+            data-testid="modal-discard-history"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-bold text-lg">Discarded Cards</h2>
+              <button
+                onClick={() => setShowDiscardHistory(false)}
+                className="text-white/50 hover:text-white text-xl leading-none"
+                data-testid="btn-close-discard-history"
+              >✕</button>
+            </div>
+            {(['S', 'H', 'D', 'C'] as const).map(suit => {
+              const suitCards = game.discardPile
+                .filter(c => c.suit === suit)
+                .sort((a, b) => RANK_ORDER_DESC.indexOf(a.rank) - RANK_ORDER_DESC.indexOf(b.rank))
+              return (
+                <div key={suit} className="flex items-center gap-3">
+                  <span className={`text-xl font-bold w-6 shrink-0 ${suit === 'H' || suit === 'D' ? 'text-red-500' : 'text-white'}`}>
+                    {SUIT_SYMBOL[suit]}
+                  </span>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {suitCards.length === 0
+                      ? <span className="text-white/20 text-sm italic self-center">—</span>
+                      : suitCards.map(card => (
+                          <div key={card.id} className="shrink-0">
+                            <CardComponent card={card} faceUp size="hand" />
+                          </div>
+                        ))
+                    }
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Round End overlay ── */}
       {game.phase === 'ROUND_END' && game.roundResult && (
