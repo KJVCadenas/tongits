@@ -53,12 +53,14 @@ export default function Lobby({ peer }: Props) {
           <button
             onClick={handleHost}
             className="px-8 py-4 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-xl text-lg transition-colors"
+            data-testid="btn-host-game"
           >
             Host Game
           </button>
           <button
             onClick={handleJoin}
             className="px-8 py-4 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-xl text-lg transition-colors"
+            data-testid="btn-join-game"
           >
             Join Game
           </button>
@@ -76,19 +78,26 @@ export default function Lobby({ peer }: Props) {
           <>
             <div className="text-center">
               <p className="text-gray-400 mb-2">Room Code</p>
-              <div className="text-5xl font-mono font-bold text-yellow-400 tracking-widest bg-green-900 px-8 py-5 rounded-xl border border-green-700 select-all">
+              <div
+                className="text-5xl font-mono font-bold text-yellow-400 tracking-widest bg-green-900 px-8 py-5 rounded-xl border border-green-700 select-all"
+                data-testid="room-code-display"
+              >
                 {roomCode}
               </div>
               <button
                 onClick={handleCopyCode}
                 className="mt-3 text-gray-400 hover:text-yellow-400 text-sm underline transition-colors"
+                data-testid="btn-copy-code"
               >
                 Copy code
               </button>
               <p className="text-gray-500 text-sm mt-1">Share with your guest</p>
             </div>
 
-            <div className={`text-lg font-semibold ${guestConnected ? 'text-green-400' : 'text-gray-400'}`}>
+            <div
+              className={`text-lg font-semibold ${guestConnected ? 'text-green-400' : 'text-gray-400'}`}
+              data-testid="guest-status"
+            >
               {guestConnected ? '✓ Guest connected!' : 'Waiting for guest…'}
             </div>
 
@@ -96,6 +105,7 @@ export default function Lobby({ peer }: Props) {
               <button
                 onClick={handleStartGame}
                 className="px-10 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xl transition-colors"
+                data-testid="btn-start-game"
               >
                 Start Game
               </button>
@@ -108,6 +118,7 @@ export default function Lobby({ peer }: Props) {
         <button
           onClick={() => setView('home')}
           className="text-gray-500 hover:text-gray-300 text-sm underline"
+          data-testid="btn-back-home"
         >
           Back
         </button>
@@ -121,7 +132,7 @@ export default function Lobby({ peer }: Props) {
       <h1 className="text-3xl font-bold text-white">Join Game</h1>
 
       {connectionStatus === 'connected' ? (
-        <div className="text-green-400 text-xl font-semibold">
+        <div className="text-green-400 text-xl font-semibold" data-testid="connection-status" data-status="connected">
           ✓ Connected! Waiting for host to start…
         </div>
       ) : (
@@ -135,21 +146,23 @@ export default function Lobby({ peer }: Props) {
               maxLength={6}
               placeholder="e.g. A3FZ9K"
               className="px-4 py-3 rounded-lg bg-green-900 border border-green-700 text-white text-2xl font-mono text-center w-48 tracking-widest focus:outline-none focus:border-yellow-400"
+              data-testid="input-room-code"
             />
             <button
               onClick={handleConnect}
               disabled={roomCodeInput.trim().length !== 6}
               className="px-8 py-3 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              data-testid="btn-connect"
             >
               Connect
             </button>
           </div>
 
           {connectionStatus === 'connecting' && (
-            <div className="text-gray-400 animate-pulse">Connecting…</div>
+            <div className="text-gray-400 animate-pulse" data-testid="connection-status" data-status="connecting">Connecting…</div>
           )}
           {connectionStatus === 'error' && (
-            <div className="text-red-400">Connection failed. Check the room code.</div>
+            <div className="text-red-400" data-testid="connection-status" data-status="error">Connection failed. Check the room code.</div>
           )}
         </>
       )}

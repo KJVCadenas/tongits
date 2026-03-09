@@ -39,9 +39,12 @@ export default function Hand({
           <div
             key={gi}
             className={`flex items-end mr-2 shrink-0 rounded-lg ring-2 ring-offset-2 ring-offset-[#0a1f2b] transition-transform duration-100 ${isValid ? 'ring-emerald-400' : 'ring-gray-500'} ${isGroupSelected ? '-translate-y-4' : ''}`}
+            data-testid="meld-group"
+            data-group-index={gi}
+            data-group-valid={isValid}
           >
             {groupCards.map((card, i) => (
-              <div key={card.id} className={i === 0 ? '' : '-ml-8'}>
+              <div key={card.id} className={i === 0 ? '' : '-ml-8'} data-card-state="grouped">
                 <Card
                   card={card}
                   faceUp={faceUp}
@@ -57,7 +60,7 @@ export default function Hand({
 
       {/* Free (ungrouped) hand cards */}
       {freeCards.map((card, i) => (
-        <div key={card.id} className={i === 0 ? '' : '-ml-8'}>
+        <div key={card.id} className={i === 0 ? '' : '-ml-8'} data-card-state="normal">
           <Card
             card={card}
             faceUp={faceUp}
@@ -78,6 +81,7 @@ export default function Hand({
           onClick={onDump}
           className="px-14 py-2 rounded bg-red-800 hover:bg-red-700 text-white text-2xl font-bold tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
           disabled={!onDump}
+          data-testid="btn-dump"
         >
           Dump
         </button>
@@ -85,6 +89,7 @@ export default function Hand({
           onClick={onAutoMeld}
           className="px-14 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-2xl font-bold tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
           disabled={!onAutoMeld}
+          data-testid="btn-auto-meld"
         >
           Auto Meld
         </button>
@@ -92,6 +97,7 @@ export default function Hand({
           onClick={onSort}
           className="px-14 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-2xl font-bold tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
           disabled={!onSort}
+          data-testid="btn-sort"
         >
           Sort
         </button>

@@ -19,9 +19,13 @@ export default function MeldZone({ melds, label: _label, size = 'meld', onMeldCl
           role={onMeldClick ? 'button' : undefined}
           tabIndex={onMeldClick ? 0 : undefined}
           onKeyDown={onMeldClick ? e => e.key === 'Enter' && onMeldClick(i) : undefined}
+          data-testid="meld"
+          data-meld-index={i}
         >
           {meld.map(card => (
-            <Card key={card.id} card={card} faceUp={true} size={size} />
+            <div key={card.id} data-card-state="melded">
+              <Card card={card} faceUp={true} size={size} />
+            </div>
           ))}
         </div>
       ))}

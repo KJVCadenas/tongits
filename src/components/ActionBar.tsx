@@ -23,12 +23,13 @@ export default function ActionBar({ onCallDraw }: Props) {
   return (
     <div className="w-full flex items-center justify-between px-4 py-1.5 bg-black/40">
       <div className="w-24" />
-      <span className="text-white text-xs font-bold tracking-widest">{promptLabel()}</span>
+      <span className="text-white text-xs font-bold tracking-widest" data-testid="turn-prompt">{promptLabel()}</span>
       <div className="w-24 flex justify-end">
         {onCallDraw && (
           <button
             onClick={onCallDraw}
             className="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-white text-xs font-bold tracking-wide transition-colors"
+            data-testid="btn-call-draw"
           >
             CALL DRAW
           </button>

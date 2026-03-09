@@ -16,6 +16,8 @@ export default function StockPile({ count, onClick, canDraw = false }: Props) {
           relative w-28 h-40 rounded-lg select-none
           ${canDraw ? 'cursor-pointer' : 'cursor-default'}
         `}
+        data-testid="btn-draw-stock"
+        data-can-draw={canDraw}
       >
         {/* Stack shadow cards */}
         {count > 2 && <div className="absolute top-2 left-2 w-28 h-40 rounded-lg border-2 border-blue-700 bg-blue-900" />}

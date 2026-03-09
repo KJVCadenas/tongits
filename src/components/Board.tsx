@@ -112,7 +112,7 @@ export default function Board({ peer }: Props) {
     <div className="flex flex-col h-screen w-screen bg-[#0d2d3e] text-white overflow-hidden">
 
       {/* ── Top strip: opponent avatars ── */}
-      <div className="flex flex-row justify-between items-center px-6 py-2 shrink-0 border-b border-white/10 bg-black/20">
+      <div className="flex flex-row justify-between items-center px-6 py-2 shrink-0 border-b border-white/10 bg-black/20" data-testid="section-opponents">
         <CardStack count={opponent.hand.length} label={opponentLabel} />
         <CardStack count={ai.hand.length} label="AI" />
       </div>
@@ -121,7 +121,7 @@ export default function Board({ peer }: Props) {
       <div className="flex flex-row flex-1 min-h-0 items-center">
 
         {/* Opponent meld zone */}
-        <div className="flex flex-col justify-center self-stretch flex-1 border-r border-white/10 bg-black/10 px-3 py-4 overflow-auto">
+        <div className="flex flex-col justify-center self-stretch flex-1 border-r border-white/10 bg-black/10 px-3 py-4 overflow-auto" data-testid="zone-opponent-melds">
           {opponent.melds.length > 0 ? (
             <MeldZone
               melds={opponent.melds}
@@ -135,7 +135,7 @@ export default function Board({ peer }: Props) {
         </div>
 
         {/* Stock + discard — shrink to fit content */}
-        <div className="flex shrink-0 items-center justify-center gap-10 px-8">
+        <div className="flex shrink-0 items-center justify-center gap-10 px-8" data-testid="section-piles">
           <StockPile
             count={game.stock.length}
             onClick={canDraw && game.stock.length > 0 ? drawFromStock : undefined}
@@ -149,7 +149,7 @@ export default function Board({ peer }: Props) {
         </div>
 
         {/* AI meld zone */}
-        <div className="flex flex-col justify-center self-stretch flex-1 border-l border-white/10 bg-black/10 px-3 py-4 overflow-auto">
+        <div className="flex flex-col justify-center self-stretch flex-1 border-l border-white/10 bg-black/10 px-3 py-4 overflow-auto" data-testid="zone-ai-melds">
           {ai.melds.length > 0 ? (
             <MeldZone
               melds={ai.melds}
@@ -164,7 +164,7 @@ export default function Board({ peer }: Props) {
       </div>
 
       {/* ── Player meld trough ── */}
-      <div className="shrink-0 mx-3 mb-2 rounded-xl bg-black/30 border border-white/10 min-h-14 flex items-center justify-between pr-3">
+      <div className="shrink-0 mx-3 mb-2 rounded-xl bg-black/30 border border-white/10 min-h-14 flex items-center justify-between pr-3" data-testid="section-player-melds">
         {me.melds.length > 0 ? (
           <MeldZone
             melds={me.melds}
@@ -180,6 +180,7 @@ export default function Board({ peer }: Props) {
             <button
               onClick={groupSelection}
               className="px-4 py-1.5 bg-blue-700 hover:bg-blue-600 rounded-lg text-white text-sm font-bold tracking-wide transition-colors"
+              data-testid="btn-group-meld"
             >
               Group
             </button>
@@ -188,6 +189,7 @@ export default function Board({ peer }: Props) {
             <button
               onClick={layPendingMelds}
               className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-white text-sm font-bold tracking-wide transition-colors"
+              data-testid="btn-lay-meld"
             >
               Lay Meld
             </button>
@@ -216,16 +218,16 @@ export default function Board({ peer }: Props) {
       {/* ── Round End overlay ── */}
       {game.phase === 'ROUND_END' && game.roundResult && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#0a1f2b] rounded-2xl p-8 border border-white/20 flex flex-col items-center gap-6 min-w-72">
-            <h2 className="text-4xl font-black text-yellow-400">
+          <div className="bg-[#0a1f2b] rounded-2xl p-8 border border-white/20 flex flex-col items-center gap-6 min-w-72" data-testid="modal-round-end">
+            <h2 className="text-4xl font-black text-yellow-400" data-testid="round-end-title">
               {game.roundResult.reason === 'tongit' ? 'TONGIT!' : 'ROUND OVER'}
             </h2>
-            <p className="text-white text-lg">
+            <p className="text-white text-lg" data-testid="round-end-result">
               Winner: <span className="font-bold capitalize">{game.roundResult.winner}</span>
               {' '}·{' '}
               <span className="text-white/60 capitalize">{game.roundResult.reason}</span>
             </p>
-            <div className="flex flex-col gap-1 text-sm w-full">
+            <div className="flex flex-col gap-1 text-sm w-full" data-testid="round-end-scores">
               {Object.entries(game.roundResult.totals).map(([pid, total]) => (
                 <div key={pid} className="flex justify-between">
                   <span className="capitalize text-white/60">{pid}</span>
@@ -236,6 +238,7 @@ export default function Board({ peer }: Props) {
             <button
               onClick={nextRound}
               className="px-8 py-3 bg-green-700 hover:bg-green-600 rounded-xl text-white font-bold text-xl transition-colors"
+              data-testid="btn-next-round"
             >
               Next Round
             </button>

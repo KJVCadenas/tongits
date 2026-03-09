@@ -23,6 +23,8 @@ export default function DiscardPile({ pile, onClick, canDraw = false }: Props) {
               role={onClick ? 'button' : undefined}
               tabIndex={onClick ? 0 : undefined}
               onKeyDown={onClick ? e => e.key === 'Enter' && onClick?.() : undefined}
+              data-testid="btn-draw-discard"
+              data-can-draw={canDraw}
             >
               <Card card={top} faceUp={true} size="hand" />
             </div>

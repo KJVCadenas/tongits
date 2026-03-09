@@ -81,6 +81,12 @@ export default function Card({ card, faceUp, selected = false, size = 'hand', on
         onClick={onClick}
         onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
         className={`${base} bg-blue-900 border-2 border-blue-700 flex items-center justify-center`}
+        data-testid="card"
+        data-card-id={card.id}
+        data-card-suit={card.suit}
+        data-card-rank={card.rank}
+        data-selected={selected}
+        data-face-up={faceUp}
       >
         <div className="w-[70%] h-[70%] rounded border border-blue-600 bg-blue-800 grid grid-cols-3 gap-0.5 p-1">
           {Array.from({ length: 9 }).map((_, i) => (
@@ -107,6 +113,12 @@ export default function Card({ card, faceUp, selected = false, size = 'hand', on
         ${onClick ? 'hover:-translate-y-1' : ''}
         ${isRed ? 'text-red-600' : 'text-gray-900'}
       `}
+      data-testid="card"
+      data-card-id={card.id}
+      data-card-suit={card.suit}
+      data-card-rank={card.rank}
+      data-selected={selected}
+      data-face-up={faceUp}
     >
       {/* Top-left: rank + suit stacked */}
       <div className="flex flex-col items-center leading-none" style={{ width: 'fit-content' }}>

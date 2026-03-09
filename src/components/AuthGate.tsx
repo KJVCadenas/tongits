@@ -22,6 +22,7 @@ export default function AuthGate({ children }: Props) {
         <button
           onClick={() => { localStorage.removeItem(STORAGE_KEY); setAuthed(false) }}
           className="fixed bottom-3 right-3 text-xs text-gray-600 hover:text-gray-400 underline"
+          data-testid="btn-logout"
         >
           Log out
         </button>
@@ -50,12 +51,14 @@ export default function AuthGate({ children }: Props) {
           placeholder="Enter password"
           autoFocus
           className="px-4 py-3 rounded-lg bg-green-900 border border-green-700 text-white text-center focus:outline-none focus:border-yellow-400 w-72"
+          data-testid="input-password"
         />
-        {error && <p className="text-red-400 text-sm">Incorrect password.</p>}
+        {error && <p className="text-red-400 text-sm" data-testid="auth-error">Incorrect password.</p>}
         <button
           type="submit"
           disabled={!input}
           className="px-8 py-3 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          data-testid="btn-auth-submit"
         >
           Enter
         </button>
