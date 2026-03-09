@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { usePeer } from '../hooks/usePeer'
 import { useUIStore } from '../store/uiStore'
 import { useGameStore } from '../store/gameStore'
@@ -36,6 +36,10 @@ export default function Lobby({ peer }: Props) {
     joinAsGuest(roomCodeInput.trim())
   }
 
+  const handleCopyCode = useCallback(() => {
+    if (roomCode) void navigator.clipboard.writeText(roomCode)
+  }, [roomCode])
+
   function handleStartGame() {
     dispatch({ type: 'START_GAME' })
   }
@@ -72,13 +76,16 @@ export default function Lobby({ peer }: Props) {
           <>
             <div className="text-center">
               <p className="text-gray-400 mb-2">Room Code</p>
-              <div
-              className="text-sm font-mono font-bold text-yellow-400 bg-green-900 px-6 py-4 rounded-xl border border-green-700 break-all cursor-pointer select-all max-w-sm text-center"
-              title="Click to select all"
-            >
-              {roomCode}
-            </div>
-              <p className="text-gray-500 text-sm mt-2">Copy and share with your guest</p>
+              <div className="text-5xl font-mono font-bold text-yellow-400 tracking-widest bg-green-900 px-8 py-5 rounded-xl border border-green-700 select-all">
+                {roomCode}
+              </div>
+              <button
+                onClick={handleCopyCode}
+                className="mt-3 text-gray-400 hover:text-yellow-400 text-sm underline transition-colors"
+              >
+                Copy code
+              </button>
+              <p className="text-gray-500 text-sm mt-1">Share with your guest</p>
             </div>
 
             <div className={`text-lg font-semibold ${guestConnected ? 'text-green-400' : 'text-gray-400'}`}>
@@ -124,14 +131,14 @@ export default function Lobby({ peer }: Props) {
             <input
               type="text"
               value={roomCodeInput}
-              onChange={e => setRoomCodeInput(e.target.value)}
-              maxLength={100}
-              placeholder="Paste room code here…"
-              className="px-4 py-3 rounded-lg bg-green-900 border border-green-700 text-white text-sm font-mono text-center w-96 focus:outline-none focus:border-yellow-400"
+              onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
+              maxLength={6}
+              placeholder="e.g. A3FZ9K"
+              className="px-4 py-3 rounded-lg bg-green-900 border border-green-700 text-white text-2xl font-mono text-center w-48 tracking-widest focus:outline-none focus:border-yellow-400"
             />
             <button
               onClick={handleConnect}
-              disabled={!roomCodeInput.trim()}
+              disabled={roomCodeInput.trim().length !== 6}
               className="px-8 py-3 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Connect

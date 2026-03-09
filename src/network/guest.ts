@@ -1,6 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs'
 import type { NetworkMessage } from './types'
 import type { GameState, GameAction } from '../game/engine'
+import { peerIdFromCode, isValidCode } from './roomCode'
 
 export type GuestCallbacks = {
   onConnected: () => void
@@ -19,9 +20,15 @@ export class GameGuest {
   }
 
   connect(roomCode: string) {
+    const normalized = roomCode.toUpperCase().trim()
+    if (!isValidCode(normalized)) {
+      this.callbacks.onError()
+      return
+    }
+    const fullPeerId = peerIdFromCode(normalized)
     this.peer = new Peer()
     this.peer.on('open', () => {
-      const conn = this.peer!.connect(roomCode)
+      const conn = this.peer!.connect(fullPeerId)
       this.conn = conn
 
       conn.on('open', () => {

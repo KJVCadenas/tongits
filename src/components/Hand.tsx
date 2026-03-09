@@ -29,7 +29,7 @@ export default function Hand({
   const freeCards = cards.filter(c => !pendingIds.has(c.id))
 
   return (
-    <div className="relative flex justify-center items-end py-6 px-4 overflow-x-auto gap-5">
+    <div className="relative flex justify-center items-end py-6 px-4 overflow-x-auto gap-0">
       {/* Pending meld groups — visually grouped, not individually selected */}
       {pendingMeldGroups.map((group, gi) => {
         const groupCards = group.map(id => cards.find(c => c.id === id)).filter(Boolean) as CardType[]
@@ -38,7 +38,7 @@ export default function Hand({
         return (
           <div
             key={gi}
-            className={`flex items-end shrink-0 rounded-lg ring-2 ring-offset-2 ring-offset-[#0a1f2b] transition-transform duration-100 ${isValid ? 'ring-emerald-400' : 'ring-gray-500'} ${isGroupSelected ? '-translate-y-4' : ''}`}
+            className={`flex items-end mr-2 shrink-0 rounded-lg ring-2 ring-offset-2 ring-offset-[#0a1f2b] transition-transform duration-100 ${isValid ? 'ring-emerald-400' : 'ring-gray-500'} ${isGroupSelected ? '-translate-y-4' : ''}`}
           >
             {groupCards.map((card, i) => (
               <div key={card.id} className={i === 0 ? '' : '-ml-8'}>

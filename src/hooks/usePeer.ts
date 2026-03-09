@@ -42,6 +42,7 @@ export function usePeer() {
           dispatch(action)
         }
       },
+      onError: () => setConnectionStatus('error'),
     })
     hostRef.current = host
     host.init()
