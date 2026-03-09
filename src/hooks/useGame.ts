@@ -14,6 +14,7 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
   const clearPendingMelds = useUIStore(s => s.clearPendingMelds)
   const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
   const addPendingMeld = useUIStore(s => s.addPendingMeld)
+  const setHighlightedPile = useUIStore(s => s.setHighlightedPile)
   const pendingMeldGroups = useUIStore(s => s.pendingMeldGroups)
   const selectedCardIds = useUIStore(s => s.selectedCardIds)
   const hasDrawnThisTurn = useUIStore(s => s.hasDrawnThisTurn) || game.dealerFirstTurn
@@ -48,8 +49,10 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
 
       // Draw: prefer discard pile, fall back to stock
       if (game.discardPile.length > 0) {
+        setHighlightedPile('discard')
         dispatch({ type: 'DRAW_FROM_DISCARD' })
       } else {
+        setHighlightedPile('stock')
         dispatch({ type: 'DRAW_FROM_STOCK' })
       }
 
@@ -74,12 +77,14 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
 
         // Discard highest-value card
         const cardToDiscard = findBestDiscard(afterMeldAi.hand)
+        setHighlightedPile('discard')
         dispatch({ type: 'DISCARD', cardId: cardToDiscard.id })
+        setTimeout(() => setHighlightedPile(null), 600)
       }, 400)
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [game.phase, game.currentTurn, game.players, game.discardPile, dispatch])
+  }, [game.phase, game.currentTurn, game.players, game.discardPile, dispatch, setHighlightedPile])
 
   function drawFromStock() {
     if (role !== game.currentTurn) return

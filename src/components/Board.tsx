@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { useGameStore } from '../store/gameStore'
 import { useUIStore } from '../store/uiStore'
 import { useGame } from '../hooks/useGame'
@@ -27,6 +28,7 @@ export default function Board({ peer }: Props) {
   const selectedCardIds = useUIStore(s => s.selectedCardIds)
   const toggleCardSelection = useUIStore(s => s.toggleCardSelection)
   const hasDrawnThisTurnRaw = useUIStore(s => s.hasDrawnThisTurn)
+  const highlightedPile = useUIStore(s => s.highlightedPile)
   const [showDiscardHistory, setShowDiscardHistory] = useState(false)
   const hasDrawnThisTurn = hasDrawnThisTurnRaw || game.dealerFirstTurn
 
@@ -115,12 +117,13 @@ export default function Board({ peer }: Props) {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex flex-col h-screen w-screen bg-[#0d2d3e] text-white overflow-hidden">
 
       {/* ── Top strip: opponent avatars ── */}
       <div className="flex flex-row justify-between items-center px-6 py-2 shrink-0 border-b border-white/10 bg-black/20" data-testid="section-opponents">
         <CardStack count={opponent.hand.length} label={opponentLabel} />
-        <CardStack count={ai.hand.length} label="AI" />
+        <CardStack count={ai.hand.length} label="AI" isActive={game.phase === 'AI_TURN'} />
       </div>
 
       {/* ── Middle row: opponent melds | stock+discard | AI melds ── */}
@@ -146,12 +149,14 @@ export default function Board({ peer }: Props) {
             count={game.stock.length}
             onClick={canDraw && game.stock.length > 0 ? drawFromStock : undefined}
             canDraw={canDraw && game.stock.length > 0}
+            isAiHighlighted={highlightedPile === 'stock'}
           />
           <DiscardPile
             pile={game.discardPile}
             onClick={canDraw && discardTopFormsMeld ? drawFromDiscard : undefined}
             canDraw={canDraw && discardTopFormsMeld}
             onViewHistory={() => setShowDiscardHistory(true)}
+            isAiHighlighted={highlightedPile === 'discard'}
           />
         </div>
 
@@ -298,5 +303,6 @@ export default function Board({ peer }: Props) {
         </div>
       )}
     </div>
+    </MotionConfig>
   )
 }

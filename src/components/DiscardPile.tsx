@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion'
 import type { Card as CardType } from '../game/deck'
 import Card from './Card'
 
@@ -6,9 +7,10 @@ type Props = {
   onClick?: () => void
   canDraw?: boolean
   onViewHistory?: () => void
+  isAiHighlighted?: boolean
 }
 
-export default function DiscardPile({ pile, onClick, canDraw = false, onViewHistory }: Props) {
+export default function DiscardPile({ pile, onClick, canDraw = false, onViewHistory, isAiHighlighted = false }: Props) {
   const top = pile[0]
   return (
     <div className="flex flex-col items-center gap-1">
@@ -19,7 +21,7 @@ export default function DiscardPile({ pile, onClick, canDraw = false, onViewHist
               <div className="absolute top-1 left-1 w-28 h-40 rounded-lg border border-gray-300 bg-white opacity-30" />
             )}
             <div
-              className={`absolute inset-0 ${canDraw ? 'cursor-pointer' : 'cursor-default'} ${canDraw ? 'ring-2 ring-amber-400/70 rounded-lg' : ''}`}
+              className={`absolute inset-0 ${canDraw ? 'cursor-pointer' : 'cursor-default'} ${canDraw ? 'ring-2 ring-amber-400/70 rounded-lg' : ''} ${isAiHighlighted ? 'ring-2 ring-indigo-400/80 rounded-lg' : ''}`}
               onClick={onClick}
               role={onClick ? 'button' : undefined}
               tabIndex={onClick ? 0 : undefined}
@@ -27,7 +29,17 @@ export default function DiscardPile({ pile, onClick, canDraw = false, onViewHist
               data-testid="btn-draw-discard"
               data-can-draw={canDraw}
             >
-              <Card card={top} faceUp={true} size="hand" />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={top.id}
+                  initial={{ y: 50, scale: 0.7, opacity: 0 }}
+                  animate={{ y: 0, scale: 1, opacity: 1 }}
+                  exit={{ y: -20, scale: 0.8, opacity: 0, transition: { duration: 0.12 } }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                >
+                  <Card card={top} faceUp={true} size="hand" />
+                </motion.div>
+              </AnimatePresence>
             </div>
           </>
         ) : (
