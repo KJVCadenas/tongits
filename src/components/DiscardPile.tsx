@@ -33,7 +33,9 @@ export default function DiscardPile({ pile, onClick, canDraw = false, onViewHist
                 <motion.div
                   key={top.id}
                   initial={{ y: 50, scale: 0.7, opacity: 0 }}
-                  animate={{ y: 0, scale: 1, opacity: 1 }}
+                  animate={canDraw
+                    ? { y: [0, -6, 0], scale: 1, opacity: 1, transition: { y: { repeat: Infinity, duration: 0.9, ease: 'easeInOut' }, scale: { type: 'spring', stiffness: 400, damping: 28 }, opacity: { duration: 0.2 } } }
+                    : { y: 0, scale: 1, opacity: 1 }}
                   exit={{ y: -20, scale: 0.8, opacity: 0, transition: { duration: 0.12 } }}
                   transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 >

@@ -48,6 +48,7 @@ export type GameState = {
   drawResponses?: Record<string, 'fold' | 'challenge'>
   lastStockDrawer?: PlayerId
   roundResult?: RoundResult
+  nextRoundVotes?: PlayerId[]
 }
 
 export type GameAction =
@@ -62,6 +63,7 @@ export type GameAction =
   | { type: 'RESPOND_DRAW'; playerId: PlayerId; response: 'fold' | 'challenge' }
   | { type: 'END_ROUND' }
   | { type: 'NEXT_ROUND' }
+  | { type: 'VOTE_NEXT_ROUND'; playerId: PlayerId }
 
 // Turn order: host → ai → guest → host (counterclockwise)
 const TURN_ORDER: PlayerId[] = ['host', 'ai', 'guest']
@@ -85,6 +87,12 @@ function getBurnedPlayers(players: PlayerState[]): PlayerId[] {
   return players.filter(p => !p.isOpened).map(p => p.id)
 }
 
+function unmatchedTotal(hand: Card[]): number {
+  const melds = detectMelds(hand)
+  const meldedIds = new Set(melds.flat().map(c => c.id))
+  return handTotal(hand.filter(c => !meldedIds.has(c.id)))
+}
+
 function buildRoundResult(
   players: PlayerState[],
   winner: PlayerId,
@@ -92,7 +100,7 @@ function buildRoundResult(
   burned: PlayerId[] = []
 ): RoundResult {
   const totals = Object.fromEntries(
-    players.map(p => [p.id, handTotal(p.hand)])
+    players.map(p => [p.id, unmatchedTotal(p.hand)])
   ) as Record<PlayerId, number>
   return { winner, reason, totals, burned }
 }
@@ -102,8 +110,8 @@ function lowestTotalWinner(
   callerTiebreak: PlayerId,
   lastStockDrawer?: PlayerId
 ): PlayerId {
-  const minTotal = Math.min(...players.map(p => handTotal(p.hand)))
-  const tied = players.filter(p => handTotal(p.hand) === minTotal)
+  const minTotal = Math.min(...players.map(p => unmatchedTotal(p.hand)))
+  const tied = players.filter(p => unmatchedTotal(p.hand) === minTotal)
 
   if (tied.length === 1) return tied[0].id
 
@@ -129,8 +137,8 @@ function resolveDrawChallenge(
   challengers: PlayerId[]
 ): PlayerId {
   const participants = players.filter(p => p.id === caller || challengers.includes(p.id))
-  const minTotal = Math.min(...participants.map(p => handTotal(p.hand)))
-  const tied = participants.filter(p => handTotal(p.hand) === minTotal)
+  const minTotal = Math.min(...participants.map(p => unmatchedTotal(p.hand)))
+  const tied = participants.filter(p => unmatchedTotal(p.hand) === minTotal)
 
   if (tied.length === 1) return tied[0].id
 
@@ -233,7 +241,7 @@ export function calculateChips(input: ChipCalculationInput): ChipResult {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   // Block all actions except NEXT_ROUND when round is over
-  if (state.phase === 'ROUND_END' && action.type !== 'NEXT_ROUND') return state
+  if (state.phase === 'ROUND_END' && action.type !== 'NEXT_ROUND' && action.type !== 'VOTE_NEXT_ROUND') return state
 
   switch (action.type) {
     case 'START_GAME': {
@@ -549,6 +557,43 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, phase: 'ROUND_END' }
     }
 
+    case 'VOTE_NEXT_ROUND': {
+      const existing = state.nextRoundVotes ?? []
+      if (existing.includes(action.playerId)) return state
+      const updated = [...existing, action.playerId]
+      const humanPlayers: PlayerId[] = ['host', 'guest']
+      const allVoted = humanPlayers.every(p => updated.includes(p))
+      if (!allVoted) return { ...state, nextRoundVotes: updated }
+      // All humans voted — run NEXT_ROUND logic
+      const newDealer = state.roundResult?.winner ?? state.dealer
+      const newHostIsDealer = newDealer === 'host'
+      const deck = shuffle(createDeck())
+      const { dealerHand, player2Hand, aiHand, stock } = deal(deck)
+      const hands = assignHands(newDealer, dealerHand, player2Hand, aiHand)
+      return {
+        ...state,
+        dealer: newDealer,
+        hostIsDealer: newHostIsDealer,
+        phase: getPhaseForTurn(newDealer),
+        players: [
+          { id: 'host', hand: hands.host, melds: [], secretSets: [], isOpened: false },
+          { id: 'guest', hand: hands.guest, melds: [], secretSets: [], isOpened: false },
+          { id: 'ai', hand: hands.ai, melds: [], secretSets: [], isOpened: false },
+        ],
+        stock,
+        discardPile: [],
+        currentTurn: newDealer,
+        dealerFirstTurn: true,
+        drawPhase: false,
+        drawRestriction: undefined,
+        drawCaller: undefined,
+        drawResponses: undefined,
+        lastStockDrawer: undefined,
+        roundResult: undefined,
+        nextRoundVotes: undefined,
+      }
+    }
+
     case 'NEXT_ROUND': {
       const newDealer = state.roundResult?.winner ?? state.dealer
       const newHostIsDealer = newDealer === 'host'
@@ -575,6 +620,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         drawResponses: undefined,
         lastStockDrawer: undefined,
         roundResult: undefined,
+        nextRoundVotes: undefined,
       }
     }
 

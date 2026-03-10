@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Card as CardType } from '../game/deck'
-import { isValidMeld } from '../game/melds'
+import { isValidMeld, getCardValue } from '../game/melds'
 import Card from './Card'
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
   faceUp: boolean
   selectedCardIds?: string[]
   pendingMeldGroups?: string[][]
+  sapawableCardIds?: string[]
   onCardClick?: (id: string) => void
   label: string
   onDump?: () => void
@@ -22,12 +23,14 @@ export default function Hand({
   faceUp,
   selectedCardIds = [],
   pendingMeldGroups = [],
+  sapawableCardIds = [],
   onCardClick,
   label: _label,
   onDump,
   onAutoMeld,
   onSort,
 }: Props) {
+  const sapawableSet = new Set(sapawableCardIds)
   const pendingIds = new Set(pendingMeldGroups.flat())
   const freeCards = cards.filter(c => !pendingIds.has(c.id))
 
@@ -75,19 +78,25 @@ export default function Hand({
             key={card.id}
             layout
             initial={{ scale: 0.5, y: -50, opacity: 0 }}
-            animate={{ scale: 1, y: 0, opacity: 1 }}
+            animate={sapawableSet.has(card.id) && !selectedCardIds.includes(card.id)
+              ? { scale: 1, opacity: 1, y: [0, -5, 0], transition: { y: { repeat: Infinity, duration: 1.0, ease: 'easeInOut' }, scale: cardSpring, opacity: { duration: 0.2 } } }
+              : { scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.5, y: -40, opacity: 0, transition: { duration: 0.15 } }}
             transition={cardSpring}
             className={i === 0 ? '' : '-ml-8'}
             data-card-state="normal"
           >
-            <Card
-              card={card}
-              faceUp={faceUp}
-              size="hand"
-              selected={selectedCardIds.includes(card.id)}
-              onClick={onCardClick ? () => onCardClick(card.id) : undefined}
-            />
+            <div className="flex flex-col items-center gap-0.5">
+              <Card
+                card={card}
+                faceUp={faceUp}
+                size="hand"
+                selected={selectedCardIds.includes(card.id)}
+                sapawHint={sapawableSet.has(card.id) && !selectedCardIds.includes(card.id)}
+                onClick={onCardClick ? () => onCardClick(card.id) : undefined}
+              />
+              {faceUp && <span className="text-xs text-white/50 font-bold">{getCardValue(card.rank)}pt</span>}
+            </div>
           </motion.div>
         ))}
       </AnimatePresence>

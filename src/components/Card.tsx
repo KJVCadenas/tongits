@@ -2,12 +2,13 @@ import { GiSpades, GiHearts, GiDiamonds, GiClubs } from 'react-icons/gi'
 import type { Card as CardType } from '../game/deck'
 import type { IconType } from 'react-icons'
 
-type CardSize = 'hand' | 'meld' | 'opponent'
+type CardSize = 'hand' | 'meld' | 'opponent' | 'modal'
 
 type Props = {
   card: CardType
   faceUp: boolean
   selected?: boolean
+  sapawHint?: boolean
   size?: CardSize
   onClick?: () => void
 }
@@ -25,6 +26,7 @@ const SIZE_CLASSES: Record<CardSize, string> = {
   hand: 'w-28 h-40',
   meld: 'w-12 h-16',
   opponent: 'w-10 h-14',
+  modal: 'w-16 h-[88px]',
 }
 
 // Top-left rank label
@@ -32,6 +34,7 @@ const RANK_SIZE: Record<CardSize, string> = {
   hand: 'text-4xl',
   meld: 'text-base',
   opponent: 'text-sm',
+  modal: 'text-xl',
 }
 
 // Top-left suit icon — same visual height as rank
@@ -39,6 +42,7 @@ const SUIT_PIP_SIZE: Record<CardSize, string> = {
   hand: 'text-4xl',
   meld: 'text-base',
   opponent: 'text-sm',
+  modal: 'text-xl',
 }
 
 // Bottom-right large suit icon
@@ -46,6 +50,7 @@ const SUIT_CORNER_SIZE: Record<CardSize, string> = {
   hand: 'text-7xl',
   meld: 'text-xl',
   opponent: 'text-base',
+  modal: 'text-4xl',
 }
 
 // Bottom-right large suit icon
@@ -53,11 +58,12 @@ const FACE_CORNER_SIZE: Record<CardSize, string> = {
   hand: 'text-7xl',
   meld: 'text-xl',
   opponent: 'text-base',
+  modal: 'text-4xl',
 }
 
 const FACE_RANKS = new Set(['A', 'J', 'Q', 'K'])
 
-export default function Card({ card, faceUp, selected = false, size = 'hand', onClick }: Props) {
+export default function Card({ card, faceUp, selected = false, sapawHint = false, size = 'hand', onClick }: Props) {
   const isRed = RED_SUITS.has(card.suit)
   const SuitIcon = SUIT_ICON[card.suit]
   const sizeClass = SIZE_CLASSES[size]
@@ -108,6 +114,8 @@ export default function Card({ card, faceUp, selected = false, size = 'hand', on
         bg-white flex flex-col p-1.5
         ${selected
           ? 'border-2 border-yellow-400 ring-2 ring-yellow-300 shadow-lg shadow-yellow-200/40'
+          : sapawHint
+          ? 'border-2 border-teal-400'
           : 'border border-gray-200 shadow-sm'
         }
         ${onClick ? 'hover:-translate-y-1' : ''}

@@ -7,20 +7,24 @@ type Props = {
   label: string
   size?: 'meld' | 'opponent' | 'hand'
   onMeldClick?: (meldIndex: number) => void
+  highlightedMeldIndices?: Set<number>
 }
 
-export default function MeldZone({ melds, label: _label, size = 'meld', onMeldClick }: Props) {
+export default function MeldZone({ melds, label: _label, size = 'meld', onMeldClick, highlightedMeldIndices }: Props) {
   return (
     <div className="flex flex-row flex-wrap gap-2 items-center min-h-8 px-2">
       <AnimatePresence>
-        {melds.map((meld, i) => (
+        {melds.map((meld, i) => {
+          const isHighlighted = highlightedMeldIndices?.has(i)
+          const isDimmed = onMeldClick && highlightedMeldIndices && !isHighlighted
+          return (
           <motion.div
             key={i}
             initial={{ scale: 0.4, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.4, opacity: 0, y: 10, transition: { duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-            className={`flex rounded transition-all ${onMeldClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 hover:ring-offset-1 hover:ring-offset-transparent' : ''}`}
+            className={`flex rounded transition-all ${onMeldClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 hover:ring-offset-1 hover:ring-offset-transparent' : ''} ${isHighlighted ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-transparent' : ''} ${isDimmed ? 'opacity-40' : ''}`}
             onClick={onMeldClick ? () => onMeldClick(i) : undefined}
             role={onMeldClick ? 'button' : undefined}
             tabIndex={onMeldClick ? 0 : undefined}
@@ -34,7 +38,8 @@ export default function MeldZone({ melds, label: _label, size = 'meld', onMeldCl
               </motion.div>
             ))}
           </motion.div>
-        ))}
+          )
+        })}
       </AnimatePresence>
     </div>
   )
