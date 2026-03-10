@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+type Role = 'host' | 'guest' | 'guest2' | null
+
 type UIStore = {
   selectedCardIds: string[]
   toggleCardSelection: (id: string) => void
@@ -9,8 +11,8 @@ type UIStore = {
   addPendingMeld: (cardIds: string[]) => void
   setPendingMeldGroups: (groups: string[][]) => void
   clearPendingMelds: () => void
-  role: 'host' | 'guest' | null
-  setRole: (role: 'host' | 'guest' | null) => void
+  role: Role
+  setRole: (role: Role) => void
   hasDrawnThisTurn: boolean
   setHasDrawnThisTurn: (val: boolean) => void
   highlightedPile: 'stock' | 'discard' | null
@@ -39,7 +41,7 @@ export const useUIStore = create<UIStore>(set => ({
   setPendingMeldGroups: (groups: string[][]) => set({ pendingMeldGroups: groups }),
   clearPendingMelds: () => set({ pendingMeldGroups: [] }),
   role: null,
-  setRole: (role: 'host' | 'guest' | null) => set({ role }),
+  setRole: (role: Role) => set({ role }),
   hasDrawnThisTurn: false,
   setHasDrawnThisTurn: (val: boolean) => set({ hasDrawnThisTurn: val }),
   highlightedPile: null,

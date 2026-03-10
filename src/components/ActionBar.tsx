@@ -14,11 +14,11 @@ export default function ActionBar({ onCallDraw }: Props) {
 
   function promptLabel() {
     if (game.phase === 'ROUND_END') return 'ROUND OVER'
-    if (game.phase === 'AI_TURN') return "AI's turn…"
+    if (game.phase === 'BOT_TURN') return `${game.playerNames[game.currentTurn]}'s turn…`
     if (isMyTurn && game.dealerFirstTurn) return 'EXPOSE MELDS OR DISCARD'
     if (isMyTurn && !hasDrawnThisTurn) return 'PICK A CARD TO DRAW'
     if (isMyTurn && hasDrawnThisTurn) return 'PLAY OR DISCARD'
-    return `${game.currentTurn?.toUpperCase()}'s turn`
+    return `${game.playerNames[game.currentTurn]}'s turn`
   }
 
   return (

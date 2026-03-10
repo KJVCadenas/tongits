@@ -1,10 +1,11 @@
 import Peer, { type DataConnection } from 'peerjs'
 import type { NetworkMessage } from './types'
-import type { GameState, GameAction } from '../game/engine'
+import type { GameState, GameAction, PlayerId } from '../game/engine'
 import { peerIdFromCode, isValidCode } from './roomCode'
 
 export type GuestCallbacks = {
   onConnected: () => void
+  onAssigned: (playerId: PlayerId) => void
   onDisconnected: () => void
   onError: () => void
   onSnapshot: (state: GameState) => void
@@ -19,7 +20,7 @@ export class GameGuest {
     this.callbacks = callbacks
   }
 
-  connect(roomCode: string) {
+  connect(roomCode: string, name: string) {
     const normalized = roomCode.toUpperCase().trim()
     if (!isValidCode(normalized)) {
       this.callbacks.onError()
@@ -32,12 +33,17 @@ export class GameGuest {
       this.conn = conn
 
       conn.on('open', () => {
+        // Immediately send our name so host can assign us a slot
+        const msg: NetworkMessage = { type: 'PLAYER_JOIN', name }
+        conn.send(msg)
         this.callbacks.onConnected()
       })
 
       conn.on('data', (raw: unknown) => {
         const msg = raw as NetworkMessage
-        if (msg.type === 'STATE_SNAPSHOT') {
+        if (msg.type === 'PLAYER_ASSIGNMENT') {
+          this.callbacks.onAssigned(msg.playerId)
+        } else if (msg.type === 'STATE_SNAPSHOT') {
           this.callbacks.onSnapshot(msg.state)
         }
       })

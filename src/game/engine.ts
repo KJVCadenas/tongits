@@ -1,13 +1,15 @@
 import { type Card, createDeck, shuffle, deal } from './deck'
 import { handTotal, isValidMeld, canExtendMeld, detectMelds } from './melds'
 
-export type PlayerId = 'host' | 'guest' | 'ai'
+export type PlayerId = 'host' | 'guest' | 'guest2' | 'bot1' | 'bot2'
+
+export type GameMode = 'solo' | 'duo' | 'trio'
 
 export type GamePhase =
   | 'LOBBY'
   | 'DEALING'
   | 'PLAYER_TURN'
-  | 'AI_TURN'
+  | 'BOT_TURN'
   | 'DRAW_RESOLUTION'
   | 'ROUND_END'
 
@@ -35,6 +37,8 @@ export type RoundResult = {
 
 export type GameState = {
   phase: GamePhase
+  gameMode: GameMode
+  playerNames: Record<PlayerId, string>
   players: PlayerState[]
   stock: Card[]
   discardPile: Card[]
@@ -52,7 +56,7 @@ export type GameState = {
 }
 
 export type GameAction =
-  | { type: 'START_GAME' }
+  | { type: 'START_GAME'; gameMode: GameMode; hostName: string; guestNames?: Partial<Record<PlayerId, string>> }
   | { type: 'DRAW_FROM_STOCK' }
   | { type: 'DRAW_FROM_DISCARD' }
   | { type: 'DISCARD'; cardId: string }
@@ -65,22 +69,39 @@ export type GameAction =
   | { type: 'NEXT_ROUND' }
   | { type: 'VOTE_NEXT_ROUND'; playerId: PlayerId }
 
-// Turn order: host → ai → guest → host (counterclockwise)
-const TURN_ORDER: PlayerId[] = ['host', 'ai', 'guest']
-
-const ALL_PLAYERS: PlayerId[] = ['host', 'guest', 'ai']
-
-export function selectDealer(): PlayerId {
-  return ALL_PLAYERS[Math.floor(Math.random() * ALL_PLAYERS.length)]
+// Turn order depends on game mode:
+//   solo:  host → bot1 → bot2 → host (counterclockwise)
+//   duo:   host → bot1 → guest → host
+//   trio:  host → guest2 → guest → host
+function getTurnOrder(mode: GameMode): PlayerId[] {
+  if (mode === 'solo') return ['host', 'bot1', 'bot2']
+  if (mode === 'duo') return ['host', 'bot1', 'guest']
+  return ['host', 'guest2', 'guest']
 }
 
-function nextTurn(current: PlayerId): PlayerId {
-  const idx = TURN_ORDER.indexOf(current)
-  return TURN_ORDER[(idx + 1) % TURN_ORDER.length]
+function getPlayersForMode(mode: GameMode): PlayerId[] {
+  return getTurnOrder(mode)
+}
+
+function getHumanPlayers(mode: GameMode): PlayerId[] {
+  if (mode === 'solo') return ['host']
+  if (mode === 'duo') return ['host', 'guest']
+  return ['host', 'guest', 'guest2']
+}
+
+export function selectDealer(mode: GameMode): PlayerId {
+  const players = getPlayersForMode(mode)
+  return players[Math.floor(Math.random() * players.length)]
+}
+
+function nextTurn(current: PlayerId, mode: GameMode): PlayerId {
+  const order = getTurnOrder(mode)
+  const idx = order.indexOf(current)
+  return order[(idx + 1) % order.length]
 }
 
 function getPhaseForTurn(turn: PlayerId): GamePhase {
-  return turn === 'ai' ? 'AI_TURN' : 'PLAYER_TURN'
+  return (turn === 'bot1' || turn === 'bot2') ? 'BOT_TURN' : 'PLAYER_TURN'
 }
 
 function getBurnedPlayers(players: PlayerState[]): PlayerId[] {
@@ -108,6 +129,7 @@ function buildRoundResult(
 function lowestTotalWinner(
   players: PlayerState[],
   callerTiebreak: PlayerId,
+  mode: GameMode,
   lastStockDrawer?: PlayerId
 ): PlayerId {
   const minTotal = Math.min(...players.map(p => unmatchedTotal(p.hand)))
@@ -120,9 +142,11 @@ function lowestTotalWinner(
     return lastStockDrawer
   }
 
+  const turnOrder = getTurnOrder(mode)
+
   // Tiebreaker 2: next in turn order after the current player (TC-TIE-2)
-  for (let i = 1; i <= TURN_ORDER.length; i++) {
-    const candidate = TURN_ORDER[(TURN_ORDER.indexOf(callerTiebreak) + i) % TURN_ORDER.length]
+  for (let i = 1; i <= turnOrder.length; i++) {
+    const candidate = turnOrder[(turnOrder.indexOf(callerTiebreak) + i) % turnOrder.length]
     if (tied.some(p => p.id === candidate)) {
       return candidate
     }
@@ -134,7 +158,8 @@ function lowestTotalWinner(
 function resolveDrawChallenge(
   players: PlayerState[],
   caller: PlayerId,
-  challengers: PlayerId[]
+  challengers: PlayerId[],
+  mode: GameMode
 ): PlayerId {
   const participants = players.filter(p => p.id === caller || challengers.includes(p.id))
   const minTotal = Math.min(...participants.map(p => unmatchedTotal(p.hand)))
@@ -145,9 +170,10 @@ function resolveDrawChallenge(
   // If caller is in the tie → challenger wins (TC-TIE-3)
   const nonCallerTied = tied.filter(p => p.id !== caller)
   if (nonCallerTied.length > 0) {
+    const turnOrder = getTurnOrder(mode)
     // Multiple challengers tie → right of caller in turn order wins (TC-TIE-4)
-    for (let i = 1; i <= TURN_ORDER.length; i++) {
-      const candidate = TURN_ORDER[(TURN_ORDER.indexOf(caller) + i) % TURN_ORDER.length]
+    for (let i = 1; i <= turnOrder.length; i++) {
+      const candidate = turnOrder[(turnOrder.indexOf(caller) + i) % turnOrder.length]
       if (nonCallerTied.some(p => p.id === candidate)) {
         return candidate
       }
@@ -157,24 +183,39 @@ function resolveDrawChallenge(
   return tied[0].id
 }
 
+// Assigns deal output to the right player IDs based on turn order.
+// Dealer gets dealerHand (13 cards), others get p2Hand and p3Hand (12 each).
 function assignHands(
   dealer: PlayerId,
   dealerHand: Card[],
-  player2Hand: Card[],
-  aiHand: Card[]
-): { host: Card[]; guest: Card[]; ai: Card[] } {
-  if (dealer === 'host') return { host: dealerHand, guest: player2Hand, ai: aiHand }
-  if (dealer === 'guest') return { host: player2Hand, guest: dealerHand, ai: aiHand }
-  // dealer === 'ai'
-  return { host: player2Hand, guest: aiHand, ai: dealerHand }
+  p2Hand: Card[],
+  p3Hand: Card[],
+  turnOrder: PlayerId[]
+): Record<PlayerId, Card[]> {
+  const result: Partial<Record<PlayerId, Card[]>> = {}
+  const nonDealers = turnOrder.filter(id => id !== dealer)
+  result[dealer] = dealerHand
+  result[nonDealers[0]] = p2Hand
+  result[nonDealers[1]] = p3Hand
+  return result as Record<PlayerId, Card[]>
+}
+
+const DEFAULT_PLAYER_NAMES: Record<PlayerId, string> = {
+  host: 'Host',
+  guest: 'Guest',
+  guest2: 'Guest 2',
+  bot1: 'Bot 1',
+  bot2: 'Bot 2',
 }
 
 export const initialGameState: GameState = {
   phase: 'LOBBY',
+  gameMode: 'solo',
+  playerNames: { ...DEFAULT_PLAYER_NAMES },
   players: [
     { id: 'host', hand: [], melds: [], secretSets: [], isOpened: false },
-    { id: 'guest', hand: [], melds: [], secretSets: [], isOpened: false },
-    { id: 'ai', hand: [], melds: [], secretSets: [], isOpened: false },
+    { id: 'bot1', hand: [], melds: [], secretSets: [], isOpened: false },
+    { id: 'bot2', hand: [], melds: [], secretSets: [], isOpened: false },
   ],
   stock: [],
   discardPile: [],
@@ -245,21 +286,36 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
   switch (action.type) {
     case 'START_GAME': {
+      const { gameMode, hostName, guestNames } = action
+      const turnOrder = getTurnOrder(gameMode)
+      const dealer = selectDealer(gameMode)
       const deck = shuffle(createDeck())
-      const { dealerHand, player2Hand, aiHand, stock } = deal(deck)
-      const dealer = state.dealer
-      const hands = assignHands(dealer, dealerHand, player2Hand, aiHand)
+      const { dealerHand, player2Hand, aiHand: p3Hand, stock } = deal(deck)
+      const hands = assignHands(dealer, dealerHand, player2Hand, p3Hand, turnOrder)
+
+      const playerNames: Record<PlayerId, string> = {
+        ...DEFAULT_PLAYER_NAMES,
+        host: hostName,
+        ...guestNames,
+      }
+
       return {
         ...state,
+        gameMode,
+        playerNames,
         phase: getPhaseForTurn(dealer),
-        players: [
-          { id: 'host', hand: hands.host, melds: [], secretSets: [], isOpened: false },
-          { id: 'guest', hand: hands.guest, melds: [], secretSets: [], isOpened: false },
-          { id: 'ai', hand: hands.ai, melds: [], secretSets: [], isOpened: false },
-        ],
+        players: turnOrder.map(id => ({
+          id,
+          hand: hands[id],
+          melds: [],
+          secretSets: [],
+          isOpened: false,
+        })),
         stock,
         discardPile: [],
         currentTurn: dealer,
+        dealer,
+        hostIsDealer: dealer === 'host',
         dealerFirstTurn: true,
         drawPhase: false,
         drawRestriction: undefined,
@@ -347,7 +403,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         const burned = getBurnedPlayers(players)
         const openedPlayers = players.filter(p => p.isOpened)
         const scoringPool = openedPlayers.length > 0 ? openedPlayers : players
-        const winner = lowestTotalWinner(scoringPool, state.currentTurn, state.lastStockDrawer)
+        const winner = lowestTotalWinner(scoringPool, state.currentTurn, state.gameMode, state.lastStockDrawer)
         return {
           ...state,
           players,
@@ -357,7 +413,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
-      const next = nextTurn(state.currentTurn)
+      const next = nextTurn(state.currentTurn, state.gameMode)
       return {
         ...state,
         players,
@@ -505,7 +561,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.drawRestriction?.playerId === action.playerId) return state
 
       const burned = getBurnedPlayers(state.players)
-      const winner = lowestTotalWinner(state.players, action.playerId)
+      const winner = lowestTotalWinner(state.players, action.playerId, state.gameMode)
       return {
         ...state,
         phase: 'ROUND_END',
@@ -544,7 +600,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       // Challenger(s) present — compare totals with tiebreakers
-      const winner = resolveDrawChallenge(state.players, state.drawCaller, challengers)
+      const winner = resolveDrawChallenge(state.players, state.drawCaller, challengers, state.gameMode)
       return {
         ...state,
         drawResponses: newResponses,
@@ -561,25 +617,28 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const existing = state.nextRoundVotes ?? []
       if (existing.includes(action.playerId)) return state
       const updated = [...existing, action.playerId]
-      const humanPlayers: PlayerId[] = ['host', 'guest']
+      const humanPlayers = getHumanPlayers(state.gameMode)
       const allVoted = humanPlayers.every(p => updated.includes(p))
       if (!allVoted) return { ...state, nextRoundVotes: updated }
-      // All humans voted — run NEXT_ROUND logic
+
+      // All humans voted — start next round
       const newDealer = state.roundResult?.winner ?? state.dealer
-      const newHostIsDealer = newDealer === 'host'
+      const turnOrder = getTurnOrder(state.gameMode)
       const deck = shuffle(createDeck())
-      const { dealerHand, player2Hand, aiHand, stock } = deal(deck)
-      const hands = assignHands(newDealer, dealerHand, player2Hand, aiHand)
+      const { dealerHand, player2Hand, aiHand: p3Hand, stock } = deal(deck)
+      const hands = assignHands(newDealer, dealerHand, player2Hand, p3Hand, turnOrder)
       return {
         ...state,
         dealer: newDealer,
-        hostIsDealer: newHostIsDealer,
+        hostIsDealer: newDealer === 'host',
         phase: getPhaseForTurn(newDealer),
-        players: [
-          { id: 'host', hand: hands.host, melds: [], secretSets: [], isOpened: false },
-          { id: 'guest', hand: hands.guest, melds: [], secretSets: [], isOpened: false },
-          { id: 'ai', hand: hands.ai, melds: [], secretSets: [], isOpened: false },
-        ],
+        players: turnOrder.map(id => ({
+          id,
+          hand: hands[id],
+          melds: [],
+          secretSets: [],
+          isOpened: false,
+        })),
         stock,
         discardPile: [],
         currentTurn: newDealer,
@@ -596,20 +655,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'NEXT_ROUND': {
       const newDealer = state.roundResult?.winner ?? state.dealer
-      const newHostIsDealer = newDealer === 'host'
+      const turnOrder = getTurnOrder(state.gameMode)
       const deck = shuffle(createDeck())
-      const { dealerHand, player2Hand, aiHand, stock } = deal(deck)
-      const hands = assignHands(newDealer, dealerHand, player2Hand, aiHand)
+      const { dealerHand, player2Hand, aiHand: p3Hand, stock } = deal(deck)
+      const hands = assignHands(newDealer, dealerHand, player2Hand, p3Hand, turnOrder)
       return {
         ...state,
         dealer: newDealer,
-        hostIsDealer: newHostIsDealer,
+        hostIsDealer: newDealer === 'host',
         phase: getPhaseForTurn(newDealer),
-        players: [
-          { id: 'host', hand: hands.host, melds: [], secretSets: [], isOpened: false },
-          { id: 'guest', hand: hands.guest, melds: [], secretSets: [], isOpened: false },
-          { id: 'ai', hand: hands.ai, melds: [], secretSets: [], isOpened: false },
-        ],
+        players: turnOrder.map(id => ({
+          id,
+          hand: hands[id],
+          melds: [],
+          secretSets: [],
+          isOpened: false,
+        })),
         stock,
         discardPile: [],
         currentTurn: newDealer,

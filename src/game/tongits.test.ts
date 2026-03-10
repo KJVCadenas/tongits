@@ -53,18 +53,33 @@ describe('TC-SETUP-3 — Initial dealing', () => {
 })
 
 describe('TC-SETUP-4 — Dealer selection (first round random)', () => {
-  it('selects a valid player as dealer randomly', () => {
-    const validDealers: PlayerId[] = ['host', 'guest', 'ai']
-    const dealer = selectDealer()
+  it('selects a valid player as dealer randomly in solo mode', () => {
+    const validDealers: PlayerId[] = ['host', 'bot1', 'bot2']
+    const dealer = selectDealer('solo')
+    expect(validDealers).toContain(dealer)
+  })
+
+  it('selects a valid player as dealer randomly in duo mode', () => {
+    const validDealers: PlayerId[] = ['host', 'bot1', 'guest']
+    const dealer = selectDealer('duo')
+    expect(validDealers).toContain(dealer)
+  })
+
+  it('selects a valid player as dealer randomly in trio mode', () => {
+    const validDealers: PlayerId[] = ['host', 'guest2', 'guest']
+    const dealer = selectDealer('trio')
     expect(validDealers).toContain(dealer)
   })
 })
 
 describe('TC-SETUP-5 — Next dealer is previous winner', () => {
   it('makes the previous round winner the dealer for the next round', () => {
-    const state = makeState({ phase: 'ROUND_END', roundResult: { winner: 'guest', reason: 'stock', totals: { host: 10, guest: 5, ai: 8 } } })
+    const state = makeState({
+      phase: 'ROUND_END',
+      roundResult: { winner: 'bot1', reason: 'stock', totals: { host: 10, bot1: 5, bot2: 8 } },
+    })
     const next = gameReducer(state, { type: 'NEXT_ROUND' })
-    expect(next.dealer).toBe('guest')
+    expect(next.dealer).toBe('bot1')
   })
 })
 
@@ -135,8 +150,8 @@ describe('TC-MELD-4 — Single card reuse', () => {
           melds: [[card('5','S'), card('6','S'), card('7','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('A','C')],
       discardPile: [],
@@ -160,8 +175,8 @@ describe('TC-MELD-5 — Secret set-of-4', () => {
           melds: [],
           isOpened: false,
         },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('2','C')],
       discardPile: [],
@@ -188,8 +203,8 @@ describe('TC-TURN-1 — Draw required before other actions', () => {
       drawPhase: true,
       players: [
         { id: 'host', hand: [card('A','S'), card('2','S')], melds: [], isOpened: false },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('3','S')],
       discardPile: [],
@@ -208,8 +223,8 @@ describe('TC-TURN-2 — Draw from stock', () => {
       drawPhase: true,
       players: [
         { id: 'host', hand: [card('A','S')], melds: [], isOpened: false },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [topCard, card('2','C')],
       discardPile: [],
@@ -235,8 +250,8 @@ describe('TC-TURN-3 — Draw from discard (valid)', () => {
           melds: [],
           isOpened: false,
         },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('A','C')],
       discardPile: [card('6','S'), card('9','D')],
@@ -262,8 +277,8 @@ describe('TC-TURN-4 — Draw from discard (invalid)', () => {
           melds: [],
           isOpened: false,
         },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('A','C')],
       discardPile: [card('K','D')],
@@ -288,8 +303,8 @@ describe('TC-TURN-5 — Discard pickup restriction (layoff only)', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [card('6','S')],
@@ -314,8 +329,8 @@ describe('TC-TURN-6 — Opening hand', () => {
           melds: [],
           isOpened: false,
         },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('A','C')],
       discardPile: [],
@@ -369,8 +384,8 @@ describe('TC-TURN-7 — Hidden meld protection', () => {
           melds: [],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: true },
-        { id: 'ai',    hand: [card('7','C')], melds: [], isOpened: true },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: true },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: true },
       ],
       stock: [],
       discardPile: [],
@@ -379,17 +394,18 @@ describe('TC-TURN-7 — Hidden meld protection', () => {
     const next = gameReducer(state, { type: 'DISCARD', cardId: '3C' })
     expect(next.phase).toBe('ROUND_END')
     expect(next.roundResult?.totals['host']).toBe(0)
-    // Host wins with 0 pts vs guest 10 pts and ai 7 pts
+    // Host wins with 0 pts vs bot1 10 pts and bot2 7 pts
     expect(next.roundResult?.winner).toBe('host')
   })
 
   it('secret meld beats higher raw total — player with secret set scores lower than non-meld holder', () => {
     // Guest holds a secret set-of-3 Kings (raw 30 pts, but unmatched = 0)
-    // Host has a stray 5C (5 pts unmatched), AI has 2C+3C (5 pts unmatched) and discards one
+    // Host has a stray 5C (5 pts unmatched), bot1 has 2C+3H and discards one
     // Without the fix, guest would appear to have 30 pts and lose; with fix guest wins with 0 pts
     const state = makeState({
+      gameMode: 'duo',
       phase: 'PLAYER_TURN',
-      currentTurn: 'ai',
+      currentTurn: 'bot1',
       drawPhase: false,
       players: [
         { id: 'host',  hand: [card('5','C')], melds: [], isOpened: true },
@@ -399,17 +415,17 @@ describe('TC-TURN-7 — Hidden meld protection', () => {
           melds: [],
           isOpened: true,
         },
-        { id: 'ai', hand: [card('2','C'), card('3','H')], melds: [], isOpened: true }, // keeps 3H (3 pts)
+        { id: 'bot1', hand: [card('2','C'), card('3','H')], melds: [], isOpened: true }, // keeps 3H (3 pts)
       ],
       stock: [],
       discardPile: [card('2','H')],
     })
-    // AI discards 2C; remaining hand = [3H] = 3 pts unmatched
+    // bot1 discards 2C; remaining hand = [3H] = 3 pts unmatched
     const next = gameReducer(state, { type: 'DISCARD', cardId: '2C' })
     expect(next.phase).toBe('ROUND_END')
     expect(next.roundResult?.totals['guest']).toBe(0)  // secret set counts 0
     expect(next.roundResult?.totals['host']).toBe(5)
-    expect(next.roundResult?.totals['ai']).toBe(3)
+    expect(next.roundResult?.totals['bot1']).toBe(3)
     expect(next.roundResult?.winner).toBe('guest')
   })
 })
@@ -430,12 +446,12 @@ describe('TC-TURN-8 — Layoff allowed on any exposed meld', () => {
           isOpened: false,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('A','C')],
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('2','C')],
       discardPile: [],
@@ -444,11 +460,11 @@ describe('TC-TURN-8 — Layoff allowed on any exposed meld', () => {
       type: 'SAPAW',
       playerId: 'host',
       cardId: '6S',
-      targetPlayerId: 'guest',
+      targetPlayerId: 'bot1',
       meldIndex: 0,
     })
-    const guest = next.players.find(p => p.id === 'guest')!
-    expect(guest.melds[0]).toHaveLength(4)
+    const bot1 = next.players.find(p => p.id === 'bot1')!
+    expect(bot1.melds[0]).toHaveLength(4)
     const host = next.players.find(p => p.id === 'host')!
     expect(host.hand).toHaveLength(1)
   })
@@ -468,12 +484,12 @@ describe('TC-TURN-9 — Layoff allowed without player having opened', () => {
           isOpened: false, // not opened
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [],
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('2','C')],
       discardPile: [],
@@ -482,7 +498,7 @@ describe('TC-TURN-9 — Layoff allowed without player having opened', () => {
       type: 'SAPAW',
       playerId: 'host',
       cardId: '6S',
-      targetPlayerId: 'guest',
+      targetPlayerId: 'bot1',
       meldIndex: 0,
     })
     // action should succeed
@@ -495,6 +511,7 @@ describe('TC-TURN-10 — Opponent meld layoff restricts Draw call for opponent',
   it('opponent cannot call Draw if the current player laid off on their meld last turn', () => {
     // host laid off on guest's meld; guest cannot call Draw on their next turn
     const state = makeState({
+      gameMode: 'duo',
       phase: 'PLAYER_TURN',
       currentTurn: 'guest',
       drawPhase: false,
@@ -506,7 +523,7 @@ describe('TC-TURN-10 — Opponent meld layoff restricts Draw call for opponent',
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -531,8 +548,8 @@ describe('TC-TURN-11 — Self meld layoff restricts Draw call', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -553,8 +570,8 @@ describe('TC-TURN-12 — Discard required', () => {
       drawPhase: false,
       players: [
         { id: 'host', hand: [card('A','S'), card('2','S')], melds: [], isOpened: false },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('3','D')],
       discardPile: [],
@@ -579,8 +596,8 @@ describe('TC-TURN-13 — Tongit exception skips discard', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -608,12 +625,12 @@ describe('TC-END-1 — Round terminates when stock empties', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('K','D')],
           melds: [],
           isOpened: true,
         },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [],
       discardPile: [],
@@ -638,20 +655,20 @@ describe('TC-END-2 — Burned players (never opened)', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('K','D'), card('Q','D')],
           melds: [],
           isOpened: false, // never opened — will be burned
         },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [],
       discardPile: [],
     })
     const next = gameReducer(state, { type: 'DISCARD', cardId: 'AS' })
     expect(next.phase).toBe('ROUND_END')
-    expect(next.roundResult?.burned).toContain('guest')
-    expect(next.roundResult?.burned).toContain('ai')
+    expect(next.roundResult?.burned).toContain('bot1')
+    expect(next.roundResult?.burned).toContain('bot2')
   })
 })
 
@@ -669,13 +686,13 @@ describe('TC-END-3 — Lowest unmatched points wins', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('K','D')], // 10 points
           melds: [],
           isOpened: true,
         },
         {
-          id: 'ai',
+          id: 'bot2',
           hand: [card('7','C')], // 7 points
           melds: [],
           isOpened: true,
@@ -703,8 +720,8 @@ describe('TC-END-4 — Tongit declaration', () => {
           melds: [],
           isOpened: false,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -729,8 +746,8 @@ describe('TC-END-5 — Valid draw call', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: true },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: true },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -753,8 +770,8 @@ describe('TC-END-6 — Invalid draw call after self sapaw', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -778,8 +795,8 @@ describe('TC-END-7 — Opponent laid-off on caller meld', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
@@ -807,15 +824,15 @@ describe('TC-DRAW-1 — All fold → caller wins', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'fold' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'fold' })
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'fold' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'fold' })
     expect(next.phase).toBe('ROUND_END')
     expect(next.roundResult?.winner).toBe('host')
     expect(next.roundResult?.reason).toBe('draw')
@@ -837,21 +854,21 @@ describe('TC-DRAW-2 — Challenge compares unmatched card points', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('K','D')], // 10 points — challenger loses
           melds: [],
           isOpened: true,
         },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'challenge' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'fold' })
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'challenge' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'fold' })
     expect(next.phase).toBe('ROUND_END')
-    // host has 3 pts, guest has 10 pts → host wins
+    // host has 3 pts, bot1 has 10 pts → host wins
     expect(next.roundResult?.winner).toBe('host')
   })
 })
@@ -871,21 +888,21 @@ describe('TC-DRAW-3 — Lowest score wins draw resolution', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('2','D')], // 2 points — challenger wins
           melds: [],
           isOpened: true,
         },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'challenge' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'fold' })
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'challenge' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'fold' })
     expect(next.phase).toBe('ROUND_END')
-    expect(next.roundResult?.winner).toBe('guest')
+    expect(next.roundResult?.winner).toBe('bot1')
   })
 })
 
@@ -893,7 +910,7 @@ describe('TC-DRAW-3 — Lowest score wins draw resolution', () => {
 
 describe('TC-TIE-1 — Stock exhaustion tie: last stock drawer wins', () => {
   it('when tie on stock exhaustion, last stock drawer wins', () => {
-    // host drew last from stock (lastStockDrawer: 'host') and ties with guest
+    // host drew last from stock (lastStockDrawer: 'host') and ties with bot1
     const state = makeState({
       phase: 'PLAYER_TURN',
       currentTurn: 'host',
@@ -907,26 +924,26 @@ describe('TC-TIE-1 — Stock exhaustion tie: last stock drawer wins', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('5','H')], // 5 points — tie
           melds: [],
           isOpened: true,
         },
-        { id: 'ai', hand: [card('K','C')], melds: [], isOpened: true },
+        { id: 'bot2', hand: [card('K','C')], melds: [], isOpened: true },
       ],
       stock: [],
       discardPile: [],
     })
     const next = gameReducer(state, { type: 'DISCARD', cardId: '5S' })
-    // host and guest tie; host was last stock drawer → host wins
+    // host and bot1 tie; host was last stock drawer → host wins
     expect(next.roundResult?.winner).toBe('host')
   })
 })
 
 describe('TC-TIE-2 — Non-stock-exhaustion tie: next in turn order wins', () => {
   it('when two non-last-drawer players tie, player next in turn order wins', () => {
-    // Draw call with tie between guest and ai; host is caller
-    // turn order: host → ai → guest; if caller is host, next in order after host = ai
+    // Draw call with tie between bot1 and guest; host is caller
+    // solo turn order: host → bot1 → bot2; if caller is host, next in order after host = bot1
     const afterCallState = makeState({
       phase: 'DRAW_RESOLUTION',
       currentTurn: 'host',
@@ -940,14 +957,14 @@ describe('TC-TIE-2 — Non-stock-exhaustion tie: next in turn order wins', () =>
           isOpened: true,
         },
         {
-          id: 'ai',
-          hand: [card('5','C')], // 5 pts — tie with guest
+          id: 'bot1',
+          hand: [card('5','C')], // 5 pts — tie with bot2
           melds: [],
           isOpened: true,
         },
         {
-          id: 'guest',
-          hand: [card('5','D')], // 5 pts — tie with ai
+          id: 'bot2',
+          hand: [card('5','D')], // 5 pts — tie with bot1
           melds: [],
           isOpened: true,
         },
@@ -956,10 +973,10 @@ describe('TC-TIE-2 — Non-stock-exhaustion tie: next in turn order wins', () =>
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'challenge' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'challenge' })
-    // ai and guest both tie at 5 pts; turn order after host is ai → ai wins
-    expect(next.roundResult?.winner).toBe('ai')
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'challenge' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'challenge' })
+    // bot1 and bot2 both tie at 5 pts; solo turn order after host is bot1 → bot1 wins
+    expect(next.roundResult?.winner).toBe('bot1')
   })
 })
 
@@ -978,27 +995,27 @@ describe('TC-TIE-3 — Caller vs challenger tie: challenger wins', () => {
           isOpened: true,
         },
         {
-          id: 'guest',
+          id: 'bot1',
           hand: [card('5','H')], // 5 pts — tie with caller
           melds: [],
           isOpened: true,
         },
-        { id: 'ai', hand: [card('K','C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('K','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'challenge' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'fold' })
-    // caller (host) ties with challenger (guest) → challenger wins
-    expect(next.roundResult?.winner).toBe('guest')
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'challenge' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'fold' })
+    // caller (host) ties with challenger (bot1) → challenger wins
+    expect(next.roundResult?.winner).toBe('bot1')
   })
 })
 
 describe('TC-TIE-4 — Two challengers tie: challenger right of caller wins', () => {
   it('when two challengers tie, the one right of caller in turn order wins', () => {
-    // turn order: host → ai → guest; caller = host; right of caller = ai (first after host)
+    // solo turn order: host → bot1 → bot2; caller = host; right of caller = bot1 (first after host)
     const afterCallState = makeState({
       phase: 'DRAW_RESOLUTION',
       currentTurn: 'host',
@@ -1012,14 +1029,14 @@ describe('TC-TIE-4 — Two challengers tie: challenger right of caller wins', ()
           isOpened: true,
         },
         {
-          id: 'ai',
-          hand: [card('5','C')], // 5 pts — ties with guest
+          id: 'bot1',
+          hand: [card('5','C')], // 5 pts — ties with bot2
           melds: [],
           isOpened: true,
         },
         {
-          id: 'guest',
-          hand: [card('5','D')], // 5 pts — ties with ai
+          id: 'bot2',
+          hand: [card('5','D')], // 5 pts — ties with bot1
           melds: [],
           isOpened: true,
         },
@@ -1028,10 +1045,10 @@ describe('TC-TIE-4 — Two challengers tie: challenger right of caller wins', ()
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'challenge' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'challenge' })
-    // ai is right of caller (host) in turn order; ai wins tie
-    expect(next.roundResult?.winner).toBe('ai')
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'challenge' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'challenge' })
+    // bot1 is right of caller (host) in solo turn order; bot1 wins tie
+    expect(next.roundResult?.winner).toBe('bot1')
   })
 })
 
@@ -1051,15 +1068,15 @@ describe('TC-LOSE-2 — Burn penalty', () => {
     const result = calculateChips({
       winner: 'host',
       reason: 'stock',
-      totals: { host: 3, guest: 15, ai: 20 },
-      burned: ['guest', 'ai'],
+      totals: { host: 3, guest: 15, bot1: 20 },
+      burned: ['guest', 'bot1'],
       secretSets: {},
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'guest', 'bot1'],
     })
     // base: +1 per loser = +2; burn bonus: +1 per burned = +2; total for host = +4
     expect(result.host).toBeGreaterThanOrEqual(4)
     expect(result.guest).toBeLessThan(0)
-    expect(result.ai).toBeLessThan(0)
+    expect(result.bot1).toBeLessThan(0)
   })
 })
 
@@ -1077,15 +1094,15 @@ describe('TC-LOSE-3 — Draw fold causes loss', () => {
           melds: [[card('3','S'), card('4','S'), card('5','S')]],
           isOpened: true,
         },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [card('7','C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
       ],
       stock: [card('9','C')],
       discardPile: [],
       drawResponses: {},
     })
-    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'guest', response: 'fold' })
-    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'ai', response: 'fold' })
+    let next = gameReducer(afterCallState, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'fold' })
+    next = gameReducer(next, { type: 'RESPOND_DRAW', playerId: 'bot2', response: 'fold' })
     expect(next.phase).toBe('ROUND_END')
     const chips = calculateChips({
       winner: next.roundResult!.winner,
@@ -1093,10 +1110,10 @@ describe('TC-LOSE-3 — Draw fold causes loss', () => {
       totals: next.roundResult!.totals,
       burned: next.roundResult!.burned ?? [],
       secretSets: {},
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
-    expect(chips.guest).toBeLessThan(0)
-    expect(chips.ai).toBeLessThan(0)
+    expect(chips.bot1).toBeLessThan(0)
+    expect(chips.bot2).toBeLessThan(0)
   })
 })
 
@@ -1107,14 +1124,14 @@ describe('TC-SCORE-1 — Base win: +1 chip per loser', () => {
     const result = calculateChips({
       winner: 'host',
       reason: 'stock',
-      totals: { host: 1, guest: 10, ai: 8 },
+      totals: { host: 1, bot1: 10, bot2: 8 },
       burned: [],
       secretSets: {},
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
     expect(result.host).toBe(2) // +1 per loser (2 losers)
-    expect(result.guest).toBe(-1)
-    expect(result.ai).toBe(-1)
+    expect(result.bot1).toBe(-1)
+    expect(result.bot2).toBe(-1)
   })
 })
 
@@ -1123,11 +1140,11 @@ describe('TC-SCORE-2 — Ace bonus: +1 chip per Ace held', () => {
     const result = calculateChips({
       winner: 'host',
       reason: 'stock',
-      totals: { host: 2, guest: 10, ai: 8 },
+      totals: { host: 2, bot1: 10, bot2: 8 },
       burned: [],
       secretSets: {},
       winnerAces: 2,
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
     // base +2, ace bonus +2 = +4
     expect(result.host).toBe(4)
@@ -1139,15 +1156,15 @@ describe('TC-SCORE-3 — Burn bonus: +1 extra chip per burned loser', () => {
     const result = calculateChips({
       winner: 'host',
       reason: 'stock',
-      totals: { host: 1, guest: 10, ai: 8 },
-      burned: ['guest'],
+      totals: { host: 1, bot1: 10, bot2: 8 },
+      burned: ['bot1'],
       secretSets: {},
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
     // base +2 (2 losers), burn bonus +1 (1 burned) = +3
     expect(result.host).toBe(3)
-    expect(result.guest).toBe(-2) // normal -1 + burn penalty -1
-    expect(result.ai).toBe(-1)
+    expect(result.bot1).toBe(-2) // normal -1 + burn penalty -1
+    expect(result.bot2).toBe(-1)
   })
 })
 
@@ -1156,10 +1173,10 @@ describe('TC-SCORE-4 — Secret set bonus: +3 chips per secret set-of-4', () => 
     const result = calculateChips({
       winner: 'host',
       reason: 'stock',
-      totals: { host: 1, guest: 10, ai: 8 },
+      totals: { host: 1, bot1: 10, bot2: 8 },
       burned: [],
       secretSets: { host: 1 },
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
     // base +2, secret set +3 = +5
     expect(result.host).toBe(5)
@@ -1171,33 +1188,33 @@ describe('TC-SCORE-5 — Tongit bonus: +3 chips instead of base +1', () => {
     const result = calculateChips({
       winner: 'host',
       reason: 'tongit',
-      totals: { host: 0, guest: 10, ai: 8 },
+      totals: { host: 0, bot1: 10, bot2: 8 },
       burned: [],
       secretSets: {},
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
     // tongit: +3 per loser (2 losers) = +6
     expect(result.host).toBe(6)
-    expect(result.guest).toBe(-3)
-    expect(result.ai).toBe(-3)
+    expect(result.bot1).toBe(-3)
+    expect(result.bot2).toBe(-3)
   })
 })
 
 describe('TC-SCORE-6 — Draw challenge win bonus: +3 chips instead of base +1', () => {
   it('winner of challenged Draw gains +3 chips per loser instead of +1', () => {
     const result = calculateChips({
-      winner: 'guest', // challenger wins
+      winner: 'bot1', // challenger wins
       reason: 'draw',
-      totals: { host: 20, guest: 2, ai: 8 },
+      totals: { host: 20, bot1: 2, bot2: 8 },
       burned: [],
       secretSets: {},
       challenged: true,
-      players: ['host', 'guest', 'ai'],
+      players: ['host', 'bot1', 'bot2'],
     })
     // challenged draw win: +3 per loser = +6
-    expect(result.guest).toBe(6)
+    expect(result.bot1).toBe(6)
     expect(result.host).toBe(-3)
-    expect(result.ai).toBe(-3)
+    expect(result.bot2).toBe(-3)
   })
 })
 
@@ -1210,8 +1227,8 @@ describe('TC-DISCARD-MELDS — Discard does not wipe player melds', () => {
       drawPhase: false,
       players: [
         { id: 'host', hand: [card('5', 'H'), card('6', 'C')], melds: [meldCards], isOpened: true },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
     })
     const next = gameReducer(state, { type: 'DISCARD', cardId: '5H' })
@@ -1223,16 +1240,16 @@ describe('TC-DISCARD-MELDS — Discard does not wipe player melds', () => {
   })
 })
 
-describe('TC-AI-DRAW — DRAW_FROM_DISCARD rejected when top card forms no meld', () => {
-  it('returns unchanged state when top discard cannot form a valid meld with AI hand', () => {
+describe('TC-BOT-DRAW — DRAW_FROM_DISCARD rejected when top card forms no meld', () => {
+  it('returns unchanged state when top discard cannot form a valid meld with bot hand', () => {
     const state = makeState({
-      currentTurn: 'ai',
-      phase: 'AI_TURN',
+      currentTurn: 'bot1',
+      phase: 'BOT_TURN',
       drawPhase: true,
       players: [
         { id: 'host', hand: [], melds: [], isOpened: false },
-        { id: 'guest', hand: [], melds: [], isOpened: false },
-        { id: 'ai', hand: [card('2', 'H'), card('7', 'S'), card('K', 'C')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('2', 'H'), card('7', 'S'), card('K', 'C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
       ],
       discardPile: [card('A', 'D')],
     })
@@ -1332,5 +1349,231 @@ describe('TC-MELD-EXT-9 — canExtendMeld rejects non-adjacent card for sequence
   it('returns false when card does not connect to either end', () => {
     const meld = [card('5', 'H'), card('6', 'H'), card('7', 'H')]
     expect(canExtendMeld(card('9', 'H'), meld)).toBe(false)
+  })
+})
+
+// ─── 10. Game Modes ──────────────────────────────────────────────────────────
+
+describe('TC-MODE-1 — Solo mode players', () => {
+  it('START_GAME with solo mode creates host, bot1, bot2 players', () => {
+    const state = makeState({ dealer: 'host' })
+    const next = gameReducer(state, {
+      type: 'START_GAME',
+      gameMode: 'solo',
+      hostName: 'Alice',
+    })
+    const ids = next.players.map(p => p.id)
+    expect(ids).toContain('host')
+    expect(ids).toContain('bot1')
+    expect(ids).toContain('bot2')
+    expect(ids).not.toContain('guest')
+    expect(ids).not.toContain('guest2')
+  })
+})
+
+describe('TC-MODE-2 — Duo mode players', () => {
+  it('START_GAME with duo mode creates host, bot1, guest players', () => {
+    const state = makeState({ dealer: 'host' })
+    const next = gameReducer(state, {
+      type: 'START_GAME',
+      gameMode: 'duo',
+      hostName: 'Alice',
+      guestNames: { guest: 'Bob' },
+    })
+    const ids = next.players.map(p => p.id)
+    expect(ids).toContain('host')
+    expect(ids).toContain('bot1')
+    expect(ids).toContain('guest')
+    expect(ids).not.toContain('bot2')
+    expect(ids).not.toContain('guest2')
+  })
+})
+
+describe('TC-MODE-3 — Trio mode players', () => {
+  it('START_GAME with trio mode creates host, guest2, guest players', () => {
+    const state = makeState({ dealer: 'host' })
+    const next = gameReducer(state, {
+      type: 'START_GAME',
+      gameMode: 'trio',
+      hostName: 'Alice',
+      guestNames: { guest: 'Bob', guest2: 'Carol' },
+    })
+    const ids = next.players.map(p => p.id)
+    expect(ids).toContain('host')
+    expect(ids).toContain('guest')
+    expect(ids).toContain('guest2')
+    expect(ids).not.toContain('bot1')
+    expect(ids).not.toContain('bot2')
+  })
+})
+
+describe('TC-MODE-4 — playerNames populated from START_GAME', () => {
+  it('host name and guest names are stored in playerNames', () => {
+    const state = makeState({ dealer: 'host' })
+    const next = gameReducer(state, {
+      type: 'START_GAME',
+      gameMode: 'duo',
+      hostName: 'Alice',
+      guestNames: { guest: 'Bob' },
+    })
+    expect(next.playerNames.host).toBe('Alice')
+    expect(next.playerNames.guest).toBe('Bob')
+    expect(next.playerNames.bot1).toBe('Bot 1') // default
+  })
+})
+
+describe('TC-MODE-5 — BOT_TURN phase for bot player', () => {
+  it('phase transitions to BOT_TURN when it is a bot\'s turn', () => {
+    // solo: host → bot1 → bot2; after host discards, turn goes to bot1
+    const state = makeState({
+      gameMode: 'solo',
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'DISCARD', cardId: 'AS' })
+    expect(next.phase).toBe('BOT_TURN')
+    expect(next.currentTurn).toBe('bot1')
+  })
+})
+
+describe('TC-MODE-6 — VOTE_NEXT_ROUND: solo only needs host', () => {
+  it('next round starts after only host votes in solo mode', () => {
+    const state = makeState({
+      gameMode: 'solo',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'stock', totals: { host: 0, bot1: 10, bot2: 8 } },
+    })
+    const next = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    // Solo: only host is human → all humans voted → advance to next round
+    expect(next.phase).not.toBe('ROUND_END')
+  })
+})
+
+describe('TC-MODE-7 — VOTE_NEXT_ROUND: duo needs host and guest', () => {
+  it('next round does not start until both host and guest vote in duo mode', () => {
+    const state = makeState({
+      gameMode: 'duo',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'stock', totals: { host: 0, bot1: 10, guest: 8 } },
+    })
+    const afterHost = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    // Not all voted yet
+    expect(afterHost.phase).toBe('ROUND_END')
+    const afterBoth = gameReducer(afterHost, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    // Now all humans voted → next round
+    expect(afterBoth.phase).not.toBe('ROUND_END')
+  })
+})
+
+describe('TC-MODE-8 — VOTE_NEXT_ROUND: trio needs host, guest, guest2', () => {
+  it('next round does not start until all three humans vote in trio mode', () => {
+    const state = makeState({
+      gameMode: 'trio',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'stock', totals: { host: 0, guest2: 8, guest: 10 } },
+    })
+    const s1 = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    expect(s1.phase).toBe('ROUND_END')
+    const s2 = gameReducer(s1, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    expect(s2.phase).toBe('ROUND_END')
+    const s3 = gameReducer(s2, { type: 'VOTE_NEXT_ROUND', playerId: 'guest2' })
+    expect(s3.phase).not.toBe('ROUND_END')
+  })
+})
+
+describe('TC-MODE-9 — Correct turn order per mode', () => {
+  it('solo discard cycles host → bot1 → bot2 → host', () => {
+    // Each player has 2 cards so discarding one doesn't trigger Tongit
+    const base = (currentTurn: PlayerId): GameState => makeState({
+      gameMode: 'solo',
+      phase: currentTurn === 'host' ? 'PLAYER_TURN' : 'BOT_TURN',
+      currentTurn,
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D'), card('3','C')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C'), card('4','D')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    const afterHost = gameReducer(base('host'), { type: 'DISCARD', cardId: 'AS' })
+    expect(afterHost.currentTurn).toBe('bot1')
+
+    const afterBot1 = gameReducer(base('bot1'), { type: 'DISCARD', cardId: 'KD' })
+    expect(afterBot1.currentTurn).toBe('bot2')
+
+    const afterBot2 = gameReducer(base('bot2'), { type: 'DISCARD', cardId: '7C' })
+    expect(afterBot2.currentTurn).toBe('host')
+  })
+
+  it('duo discard cycles host → bot1 → guest → host', () => {
+    const base = (currentTurn: PlayerId): GameState => makeState({
+      gameMode: 'duo',
+      phase: currentTurn === 'host' || currentTurn === 'guest' ? 'PLAYER_TURN' : 'BOT_TURN',
+      currentTurn,
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D'), card('3','C')], melds: [], isOpened: false },
+        { id: 'guest', hand: [card('7','C'), card('4','D')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    const afterHost = gameReducer(base('host'), { type: 'DISCARD', cardId: 'AS' })
+    expect(afterHost.currentTurn).toBe('bot1')
+
+    const afterBot1 = gameReducer(base('bot1'), { type: 'DISCARD', cardId: 'KD' })
+    expect(afterBot1.currentTurn).toBe('guest')
+
+    const afterGuest = gameReducer(base('guest'), { type: 'DISCARD', cardId: '7C' })
+    expect(afterGuest.currentTurn).toBe('host')
+  })
+
+  it('trio discard cycles host → guest2 → guest → host', () => {
+    const base = (currentTurn: PlayerId): GameState => makeState({
+      gameMode: 'trio',
+      phase: 'PLAYER_TURN',
+      currentTurn,
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','H')], melds: [], isOpened: false },
+        { id: 'guest2', hand: [card('K','D'), card('3','C')], melds: [], isOpened: false },
+        { id: 'guest', hand: [card('7','C'), card('4','D')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    const afterHost = gameReducer(base('host'), { type: 'DISCARD', cardId: 'AS' })
+    expect(afterHost.currentTurn).toBe('guest2')
+
+    const afterGuest2 = gameReducer(base('guest2'), { type: 'DISCARD', cardId: 'KD' })
+    expect(afterGuest2.currentTurn).toBe('guest')
+
+    const afterGuest = gameReducer(base('guest'), { type: 'DISCARD', cardId: '7C' })
+    expect(afterGuest.currentTurn).toBe('host')
+  })
+})
+
+describe('TC-MODE-10 — playerNames preserved across rounds', () => {
+  it('VOTE_NEXT_ROUND preserves playerNames into next round', () => {
+    const state = makeState({
+      gameMode: 'solo',
+      playerNames: { host: 'Alice', bot1: 'Bot 1', bot2: 'Bot 2', guest: 'Guest', guest2: 'Guest 2' },
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'tongit', totals: { host: 0, bot1: 5, bot2: 8 } },
+    })
+    const next = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    expect(next.playerNames.host).toBe('Alice')
+    expect(next.playerNames.bot1).toBe('Bot 1')
   })
 })
