@@ -1577,3 +1577,833 @@ describe('TC-MODE-10 — playerNames preserved across rounds', () => {
     expect(next.playerNames.bot1).toBe('Bot 1')
   })
 })
+
+// ─── 11. Draw Phase Guards ───────────────────────────────────────────────────
+
+describe('TC-GUARD-DRAW-1 — DRAW_FROM_STOCK rejected when drawPhase is false', () => {
+  it('returns unchanged state when trying to draw from stock outside draw phase', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'DRAW_FROM_STOCK' })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-DRAW-2 — DRAW_FROM_STOCK rejected when stock is empty', () => {
+  it('returns unchanged state when stock pile is empty', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: true,
+      players: [
+        { id: 'host', hand: [card('A','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [],
+      discardPile: [card('3','C')],
+    })
+    const next = gameReducer(state, { type: 'DRAW_FROM_STOCK' })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-DRAW-3 — DRAW_FROM_DISCARD rejected when drawPhase is false', () => {
+  it('returns unchanged state when trying to draw from discard outside draw phase', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('4','S'), card('5','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [card('6','S')],
+    })
+    const next = gameReducer(state, { type: 'DRAW_FROM_DISCARD' })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-DRAW-4 — DRAW_FROM_DISCARD rejected when discard pile is empty', () => {
+  it('returns unchanged state when discard pile is empty', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: true,
+      players: [
+        { id: 'host', hand: [card('4','S'), card('5','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'DRAW_FROM_DISCARD' })
+    expect(next).toBe(state)
+  })
+})
+
+// ─── 12. Discard Guards ──────────────────────────────────────────────────────
+
+describe('TC-GUARD-DISCARD-1 — DISCARD rejected when cardId not in hand', () => {
+  it('returns unchanged state when discarding a card not held in hand', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('3','D')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'DISCARD', cardId: 'KS' }) // KS not in hand
+    expect(next).toBe(state)
+  })
+})
+
+// ─── 13. LAY_MELD Guards ─────────────────────────────────────────────────────
+
+describe('TC-GUARD-LAY-MELD-1 — LAY_MELD rejected when drawPhase is true', () => {
+  it('returns unchanged state when trying to lay meld during draw phase', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: true,
+      players: [
+        { id: 'host', hand: [card('3','S'), card('4','S'), card('5','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'LAY_MELD', playerId: 'host', cardIds: ['3S','4S','5S'] })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-LAY-MELD-2 — LAY_MELD rejected when not player\'s turn', () => {
+  it('returns unchanged state when a player tries to lay meld on another\'s turn', () => {
+    const state = makeState({
+      phase: 'BOT_TURN',
+      currentTurn: 'bot1',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('3','S'), card('4','S'), card('5','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    // host tries to lay a meld but it's bot1's turn
+    const next = gameReducer(state, { type: 'LAY_MELD', playerId: 'host', cardIds: ['3S','4S','5S'] })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-LAY-MELD-3 — LAY_MELD rejected when cards don\'t form valid meld', () => {
+  it('returns unchanged state when the submitted cards are not a valid meld', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('3','S'), card('4','H'), card('7','D')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    // 3S, 4H, 7D is neither a run nor a set
+    const next = gameReducer(state, { type: 'LAY_MELD', playerId: 'host', cardIds: ['3S','4H','7D'] })
+    expect(next).toBe(state)
+  })
+})
+
+// ─── 14. SAPAW Guards ────────────────────────────────────────────────────────
+
+describe('TC-GUARD-SAPAW-1 — SAPAW rejected when drawPhase is true', () => {
+  it('returns unchanged state when trying to sapaw during draw phase', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: true,
+      players: [
+        { id: 'host', hand: [card('6','S')], melds: [], isOpened: false },
+        {
+          id: 'bot1',
+          hand: [],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: '6S',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-SAPAW-2 — SAPAW rejected when not player\'s turn', () => {
+  it('returns unchanged state when a player tries to sapaw on another\'s turn', () => {
+    const state = makeState({
+      phase: 'BOT_TURN',
+      currentTurn: 'bot1',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('6','S')], melds: [], isOpened: false },
+        {
+          id: 'bot1',
+          hand: [card('K','D')],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    // host tries to sapaw but it's bot1's turn
+    const next = gameReducer(state, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: '6S',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-SAPAW-3 — SAPAW rejected when card not in hand', () => {
+  it('returns unchanged state when the sapaw card is not in the player\'s hand', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','H')], melds: [], isOpened: false },
+        {
+          id: 'bot1',
+          hand: [],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    // 6S is not in host's hand
+    const next = gameReducer(state, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: '6S',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-SAPAW-4 — SAPAW rejected when meldIndex out of bounds', () => {
+  it('returns unchanged state when meldIndex does not point to an existing meld', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('6','S')], melds: [], isOpened: false },
+        {
+          id: 'bot1',
+          hand: [],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    // meldIndex 5 doesn't exist
+    const next = gameReducer(state, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: '6S',
+      targetPlayerId: 'bot1',
+      meldIndex: 5,
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-SAPAW-5 — SAPAW rejected when canExtendMeld returns false', () => {
+  it('returns unchanged state when the card cannot extend the target meld', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('K','H')], melds: [], isOpened: false },
+        {
+          id: 'bot1',
+          hand: [],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    // KH cannot extend the 3-4-5 of spades run
+    const next = gameReducer(state, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: 'KH',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-TONGIT-SAPAW — Tongit via SAPAW empties hand', () => {
+  it('triggers ROUND_END with tongit reason when sapaw empties player hand', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('6','S')], melds: [], isOpened: false }, // only 1 card
+        {
+          id: 'bot1',
+          hand: [card('A','D')],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [card('K','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: '6S',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    expect(next.phase).toBe('ROUND_END')
+    expect(next.roundResult?.winner).toBe('host')
+    expect(next.roundResult?.reason).toBe('tongit')
+  })
+})
+
+// ─── 15. LAY_SECRET_SET Guards ───────────────────────────────────────────────
+
+describe('TC-GUARD-SECRET-1 — LAY_SECRET_SET rejected with wrong card count', () => {
+  it('returns unchanged state when fewer than 4 cards are provided', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          hand: [card('Q','S'), card('Q','H'), card('Q','D'), card('A','C')],
+          melds: [],
+          isOpened: false,
+        },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    // Only 3 cards — requires exactly 4
+    const next = gameReducer(state, {
+      type: 'LAY_SECRET_SET',
+      playerId: 'host',
+      cardIds: ['QS', 'QH', 'QD'],
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-SECRET-2 — LAY_SECRET_SET rejected when cards not all same rank', () => {
+  it('returns unchanged state when the 4 cards are not all the same rank', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          hand: [card('Q','S'), card('Q','H'), card('Q','D'), card('K','C')],
+          melds: [],
+          isOpened: false,
+        },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    // KC has different rank than QS, QH, QD
+    const next = gameReducer(state, {
+      type: 'LAY_SECRET_SET',
+      playerId: 'host',
+      cardIds: ['QS', 'QH', 'QD', 'KC'],
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-SECRET-3 — LAY_SECRET_SET rejected when suits are duplicate', () => {
+  it('returns unchanged state when the 4 cards have fewer than 4 distinct suits', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          // Two spades — duplicate suit
+          hand: [card('Q','S'), card('Q','H'), card('Q','D'), card('Q','S')],
+          melds: [],
+          isOpened: false,
+        },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'bot2', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    // Two cards with id 'QS' — only 3 distinct suits (S, H, D)
+    const next = gameReducer(state, {
+      type: 'LAY_SECRET_SET',
+      playerId: 'host',
+      cardIds: ['QS', 'QH', 'QD', 'QS'],
+    })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-TONGIT-SECRET — Tongit via LAY_SECRET_SET empties hand', () => {
+  it('triggers ROUND_END with tongit when secret set is the last cards in hand', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          // Exactly the 4 Queens — laying them all empties the hand
+          hand: [card('Q','S'), card('Q','H'), card('Q','D'), card('Q','C')],
+          melds: [],
+          isOpened: false,
+        },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('2','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, {
+      type: 'LAY_SECRET_SET',
+      playerId: 'host',
+      cardIds: ['QS', 'QH', 'QD', 'QC'],
+    })
+    expect(next.phase).toBe('ROUND_END')
+    expect(next.roundResult?.winner).toBe('host')
+    expect(next.roundResult?.reason).toBe('tongit')
+  })
+})
+
+// ─── 16. CALL_DRAW Guards ────────────────────────────────────────────────────
+
+describe('TC-GUARD-CALL-DRAW-1 — CALL_DRAW rejected when player has not opened', () => {
+  it('returns unchanged state when the caller has not opened their hand', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'CALL_DRAW', playerId: 'host' })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-CALL-DRAW-2 — CALL_DRAW rejected when not player\'s turn', () => {
+  it('returns unchanged state when a non-current player tries to call draw', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'bot1',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          hand: [card('A','S')],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot1', hand: [card('K','D'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    // host tries to call draw but it's bot1's turn
+    const next = gameReducer(state, { type: 'CALL_DRAW', playerId: 'host' })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-CALL-DRAW-3 — CALL_DRAW rejected when phase is not PLAYER_TURN', () => {
+  it('returns unchanged state when CALL_DRAW is attempted during BOT_TURN', () => {
+    const state = makeState({
+      phase: 'BOT_TURN',
+      currentTurn: 'bot1',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          hand: [card('A','S')],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot1', hand: [card('K','D'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    // bot1 is current turn but phase is BOT_TURN, not PLAYER_TURN
+    const next = gameReducer(state, { type: 'CALL_DRAW', playerId: 'bot1' })
+    expect(next).toBe(state)
+  })
+})
+
+// ─── 17. RESPOND_DRAW Guards ─────────────────────────────────────────────────
+
+describe('TC-GUARD-RESPOND-1 — RESPOND_DRAW rejected when phase is not DRAW_RESOLUTION', () => {
+  it('returns unchanged state when responding during wrong phase', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      drawCaller: 'host',
+      players: [
+        { id: 'host', hand: [card('A','S')], melds: [], isOpened: true },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'RESPOND_DRAW', playerId: 'bot1', response: 'fold' })
+    expect(next).toBe(state)
+  })
+})
+
+describe('TC-GUARD-RESPOND-2 — RESPOND_DRAW rejected when caller responds to own draw', () => {
+  it('returns unchanged state when draw caller tries to respond to their own draw', () => {
+    const state = makeState({
+      phase: 'DRAW_RESOLUTION',
+      currentTurn: 'host',
+      drawPhase: false,
+      drawCaller: 'host',
+      players: [
+        { id: 'host', hand: [card('A','S')], melds: [], isOpened: true },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('9','C')],
+      discardPile: [],
+      drawResponses: {},
+    })
+    const next = gameReducer(state, { type: 'RESPOND_DRAW', playerId: 'host', response: 'fold' })
+    expect(next).toBe(state)
+  })
+})
+
+// ─── 18. VOTE_NEXT_ROUND Guards ──────────────────────────────────────────────
+
+describe('TC-GUARD-VOTE-1 — VOTE_NEXT_ROUND duplicate vote ignored', () => {
+  it('returns unchanged state when the same player votes twice', () => {
+    const state = makeState({
+      gameMode: 'duo',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'stock', totals: { host: 0, bot1: 10, guest: 8 } },
+    })
+    const afterFirst = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    // Host votes again — should be ignored
+    const afterSecond = gameReducer(afterFirst, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    expect(afterSecond).toBe(afterFirst)
+  })
+})
+
+// ─── 19. END_ROUND Action ────────────────────────────────────────────────────
+
+describe('TC-END-ROUND — END_ROUND action transitions to ROUND_END phase', () => {
+  it('sets phase to ROUND_END regardless of current phase', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      players: [
+        { id: 'host', hand: [card('A','S')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+    })
+    const next = gameReducer(state, { type: 'END_ROUND' })
+    expect(next.phase).toBe('ROUND_END')
+  })
+})
+
+// ─── 20. DRAW_FROM_DISCARD Tongit ────────────────────────────────────────────
+
+describe('TC-TONGIT-DISCARD-DRAW — Tongit via DRAW_FROM_DISCARD', () => {
+  it('triggers ROUND_END with tongit when drawing from discard empties the hand', () => {
+    // host has 2 cards; draws 6S from discard which completes a run 4S-5S-6S
+    // The meld is atomically exposed and the remaining hand is empty → tongit
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: true,
+      players: [
+        {
+          id: 'host',
+          hand: [card('4','S'), card('5','S')], // drawing 6S completes a run → 0 cards left
+          melds: [],
+          isOpened: false,
+        },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [card('6','S')],
+    })
+    const next = gameReducer(state, { type: 'DRAW_FROM_DISCARD' })
+    expect(next.phase).toBe('ROUND_END')
+    expect(next.roundResult?.winner).toBe('host')
+    expect(next.roundResult?.reason).toBe('tongit')
+  })
+})
+
+// ─── 21. Stock exhaustion — no players opened ────────────────────────────────
+
+describe('TC-STOCK-NONE-OPENED — Stock exhaustion with no opened players uses all players', () => {
+  it('selects winner from all players when none have opened', () => {
+    // No player has opened; scoring pool = all players
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S')], melds: [], isOpened: false }, // 1 pt after discard = 0 pts
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false }, // 10 pts
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false }, // 7 pts
+      ],
+      stock: [], // empty → next discard ends round
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'DISCARD', cardId: 'AS' })
+    // host discards their only card → hand empty → tongit (not stock end)
+    // Let's test with 2 cards so discard doesn't trigger tongit
+    const state2 = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','D')], melds: [], isOpened: false }, // discards AS → 2 pts
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false }, // 10 pts
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false }, // 7 pts
+      ],
+      stock: [],
+      discardPile: [],
+    })
+    const next2 = gameReducer(state2, { type: 'DISCARD', cardId: 'AS' })
+    expect(next2.phase).toBe('ROUND_END')
+    expect(next2.roundResult?.reason).toBe('stock')
+    // host has 2 pts (2D), bot1 has 10 pts, bot2 has 7 pts → host wins
+    expect(next2.roundResult?.winner).toBe('host')
+    // All 3 burned (none opened)
+    expect(next2.roundResult?.burned).toHaveLength(3)
+  })
+})
+
+// ─── 22. Multiple Sapaws on Same Meld ────────────────────────────────────────
+
+describe('TC-MULTI-SAPAW — Multiple players can sapaw the same meld', () => {
+  it('two different players can each extend the same exposed meld', () => {
+    // bot1 has meld [3S, 4S, 5S]; host sapaws 6S, then bot2 sapaws 2S
+    const baseState = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('6','S'), card('K','H')], melds: [], isOpened: false },
+        {
+          id: 'bot1',
+          hand: [card('A','D')],
+          melds: [[card('3','S'), card('4','S'), card('5','S')]],
+          isOpened: true,
+        },
+        { id: 'bot2', hand: [card('2','S'), card('9','D')], melds: [], isOpened: false },
+      ],
+      stock: [card('J','C')],
+      discardPile: [],
+    })
+
+    // Host sapaws 6S onto bot1's meld
+    const afterHost = gameReducer(baseState, {
+      type: 'SAPAW',
+      playerId: 'host',
+      cardId: '6S',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    const bot1After1 = afterHost.players.find(p => p.id === 'bot1')!
+    expect(bot1After1.melds[0]).toHaveLength(4) // 3S, 4S, 5S, 6S
+
+    // Now bot2's turn — sapaw 2S onto same meld (now [3S,4S,5S,6S])
+    const stateForBot2 = { ...afterHost, currentTurn: 'bot2' as PlayerId, phase: 'PLAYER_TURN' as const }
+    const afterBot2 = gameReducer(stateForBot2, {
+      type: 'SAPAW',
+      playerId: 'bot2',
+      cardId: '2S',
+      targetPlayerId: 'bot1',
+      meldIndex: 0,
+    })
+    const bot1After2 = afterBot2.players.find(p => p.id === 'bot1')!
+    expect(bot1After2.melds[0]).toHaveLength(5) // 3S,4S,5S,6S,2S
+    const bot2After = afterBot2.players.find(p => p.id === 'bot2')!
+    expect(bot2After.hand).toHaveLength(1) // 9D remains
+  })
+})
+
+// ─── 23. Dealer First Turn Flag ──────────────────────────────────────────────
+
+describe('TC-DEALER-FLAG-1 — dealerFirstTurn set to true on new round', () => {
+  it('VOTE_NEXT_ROUND sets dealerFirstTurn: true for the new round', () => {
+    const state = makeState({
+      gameMode: 'solo',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'tongit', totals: { host: 0, bot1: 5, bot2: 8 } },
+    })
+    const next = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    expect(next.dealerFirstTurn).toBe(true)
+  })
+})
+
+describe('TC-DEALER-FLAG-2 — dealerFirstTurn cleared after discard', () => {
+  it('dealerFirstTurn becomes false after any discard', () => {
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      dealerFirstTurn: true,
+      players: [
+        { id: 'host', hand: [card('A','S'), card('2','H')], melds: [], isOpened: false },
+        { id: 'bot1', hand: [card('K','D')], melds: [], isOpened: false },
+        { id: 'bot2', hand: [card('7','C')], melds: [], isOpened: false },
+      ],
+      stock: [card('3','D')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'DISCARD', cardId: 'AS' })
+    expect(next.dealerFirstTurn).toBe(false)
+  })
+})
+
+// ─── 24. START_GAME Initialization ───────────────────────────────────────────
+
+describe('TC-START-HAND-SIZE — START_GAME deals correct hand sizes', () => {
+  it('dealer receives 13 cards, other two players receive 12 each', () => {
+    const state = makeState({})
+    const next = gameReducer(state, {
+      type: 'START_GAME',
+      gameMode: 'solo',
+      hostName: 'Test',
+    })
+    const dealer = next.players.find(p => p.id === next.dealer)!
+    const others = next.players.filter(p => p.id !== next.dealer)
+    expect(dealer.hand).toHaveLength(13)
+    others.forEach(p => expect(p.hand).toHaveLength(12))
+  })
+})
+
+describe('TC-HOST-IS-DEALER — hostIsDealer flag set correctly', () => {
+  it('hostIsDealer is true when host is dealer, false otherwise', () => {
+    // Run multiple times to hit both branches (random dealer)
+    let hostWasDealer = false
+    let hostWasNotDealer = false
+    for (let i = 0; i < 100; i++) {
+      const next = gameReducer(makeState({}), {
+        type: 'START_GAME',
+        gameMode: 'solo',
+        hostName: 'Test',
+      })
+      if (next.dealer === 'host') {
+        expect(next.hostIsDealer).toBe(true)
+        hostWasDealer = true
+      } else {
+        expect(next.hostIsDealer).toBe(false)
+        hostWasNotDealer = true
+      }
+      if (hostWasDealer && hostWasNotDealer) break
+    }
+    // Sanity: both branches were hit in 100 trials
+    expect(hostWasDealer).toBe(true)
+    expect(hostWasNotDealer).toBe(true)
+  })
+})
+
+describe('TC-MODE-GAMEMODE-PRESERVED — gameMode preserved across VOTE_NEXT_ROUND', () => {
+  it('gameMode carries over into the new round', () => {
+    const state = makeState({
+      gameMode: 'duo',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'stock', totals: { host: 0, bot1: 10, guest: 8 } },
+    })
+    const afterHost = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+    expect(afterHost.phase).toBe('ROUND_END') // guest hasn't voted yet
+    const afterGuest = gameReducer(afterHost, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    expect(afterGuest.gameMode).toBe('duo')
+  })
+})
