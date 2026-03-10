@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createDeck, deal, shuffle } from './deck'
 import type { Card, Rank, Suit } from './deck'
-import { getCardValue, handTotal, isValidMeld, canExtendMeld } from './melds'
+import { getCardValue, handTotal, isValidMeld, canExtendMeld, detectMelds } from './melds'
 import {
   gameReducer,
   initialGameState,
@@ -327,16 +327,90 @@ describe('TC-TURN-6 — Opening hand', () => {
 })
 
 describe('TC-TURN-7 — Hidden meld protection', () => {
-  it('cards in hand (not yet exposed) do not count toward unmatched score for scoring', () => {
-    // handTotal only counts hand cards; melds are not included
-    const hand = [card('K','S'), card('K','H'), card('K','D')]
-    const exposedMelds = [[card('3','S'), card('4','S'), card('5','S')]]
-    // hand total of exposed meld cards is 0 (not in hand)
-    expect(handTotal(hand)).toBe(30)
-    const meldTotal = handTotal(exposedMelds[0])
-    expect(meldTotal).toBe(12) // 3+4+5, but these are in melds not hand
-    // Only hand cards count as unmatched
-    expect(handTotal(hand)).toBe(30)
+  it('secret set-of-3 in hand is detected and excluded from unmatched score', () => {
+    const hand = [card('K','S'), card('K','H'), card('K','D'), card('2','C')]
+    const melds = detectMelds(hand)
+    const meldedIds = new Set(melds.flat().map(c => c.id))
+    const unmatched = hand.filter(c => !meldedIds.has(c.id))
+    // Three Kings form a set → excluded; only 2C remains unmatched
+    expect(unmatched).toHaveLength(1)
+    expect(handTotal(unmatched)).toBe(2)
+  })
+
+  it('secret set-of-4 in hand scores 0 unmatched points', () => {
+    const hand = [card('8','S'), card('8','H'), card('8','D'), card('8','C')]
+    const melds = detectMelds(hand)
+    const meldedIds = new Set(melds.flat().map(c => c.id))
+    const unmatched = hand.filter(c => !meldedIds.has(c.id))
+    expect(unmatched).toHaveLength(0)
+    expect(handTotal(unmatched)).toBe(0)
+  })
+
+  it('secret sequence in hand is excluded from unmatched score', () => {
+    const hand = [card('5','S'), card('6','S'), card('7','S'), card('K','H')]
+    const melds = detectMelds(hand)
+    const meldedIds = new Set(melds.flat().map(c => c.id))
+    const unmatched = hand.filter(c => !meldedIds.has(c.id))
+    // 5-6-7 of spades is a sequence → only KH unmatched
+    expect(unmatched).toHaveLength(1)
+    expect(handTotal(unmatched)).toBe(10)
+  })
+
+  it('round result totals exclude secret melds held in hand', () => {
+    // Host holds three 10s (a valid set) + one stray card; should score only the stray
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'host',
+      drawPhase: false,
+      players: [
+        {
+          id: 'host',
+          hand: [card('10','S'), card('10','H'), card('10','D'), card('3','C')],
+          melds: [],
+          isOpened: true,
+        },
+        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: true },
+        { id: 'ai',    hand: [card('7','C')], melds: [], isOpened: true },
+      ],
+      stock: [],
+      discardPile: [],
+    })
+    // Host discards the 3C; now hand = [10S,10H,10D] which is a full secret set → 0 unmatched
+    const next = gameReducer(state, { type: 'DISCARD', cardId: '3C' })
+    expect(next.phase).toBe('ROUND_END')
+    expect(next.roundResult?.totals['host']).toBe(0)
+    // Host wins with 0 pts vs guest 10 pts and ai 7 pts
+    expect(next.roundResult?.winner).toBe('host')
+  })
+
+  it('secret meld beats higher raw total — player with secret set scores lower than non-meld holder', () => {
+    // Guest holds a secret set-of-3 Kings (raw 30 pts, but unmatched = 0)
+    // Host has a stray 5C (5 pts unmatched), AI has 2C+3C (5 pts unmatched) and discards one
+    // Without the fix, guest would appear to have 30 pts and lose; with fix guest wins with 0 pts
+    const state = makeState({
+      phase: 'PLAYER_TURN',
+      currentTurn: 'ai',
+      drawPhase: false,
+      players: [
+        { id: 'host',  hand: [card('5','C')], melds: [], isOpened: true },
+        {
+          id: 'guest',
+          hand: [card('K','S'), card('K','H'), card('K','D')], // secret set → 0 pts
+          melds: [],
+          isOpened: true,
+        },
+        { id: 'ai', hand: [card('2','C'), card('3','H')], melds: [], isOpened: true }, // keeps 3H (3 pts)
+      ],
+      stock: [],
+      discardPile: [card('2','H')],
+    })
+    // AI discards 2C; remaining hand = [3H] = 3 pts unmatched
+    const next = gameReducer(state, { type: 'DISCARD', cardId: '2C' })
+    expect(next.phase).toBe('ROUND_END')
+    expect(next.roundResult?.totals['guest']).toBe(0)  // secret set counts 0
+    expect(next.roundResult?.totals['host']).toBe(5)
+    expect(next.roundResult?.totals['ai']).toBe(3)
+    expect(next.roundResult?.winner).toBe('guest')
   })
 })
 
@@ -494,26 +568,6 @@ describe('TC-TURN-12 — Discard required', () => {
 
 describe('TC-TURN-13 — Tongit exception skips discard', () => {
   it('player with no remaining unmatched cards wins instantly without discarding', () => {
-    const state = makeState({
-      phase: 'PLAYER_TURN',
-      currentTurn: 'host',
-      drawPhase: false,
-      players: [
-        {
-          id: 'host',
-          hand: [card('A','S')],
-          melds: [[card('3','S'), card('4','S'), card('5','S')]],
-          isOpened: true,
-        },
-        { id: 'guest', hand: [card('K','D')], melds: [], isOpened: false },
-        { id: 'ai', hand: [], melds: [], isOpened: false },
-      ],
-      stock: [card('9','C')],
-      discardPile: [],
-    })
-    // Laying the final meld with last card triggers tongit instantly
-    const next = gameReducer(state, { type: 'LAY_MELD', playerId: 'host', cardIds: ['AS'] })
-    // Wait — tongit via single card isn't a valid meld. Let's test via discard that empties hand
     const state2 = makeState({
       phase: 'PLAYER_TURN',
       currentTurn: 'host',
@@ -1144,5 +1198,139 @@ describe('TC-SCORE-6 — Draw challenge win bonus: +3 chips instead of base +1',
     expect(result.guest).toBe(6)
     expect(result.host).toBe(-3)
     expect(result.ai).toBe(-3)
+  })
+})
+
+describe('TC-DISCARD-MELDS — Discard does not wipe player melds', () => {
+  it('keeps laid melds intact after a discard', () => {
+    const meldCards = [card('A', 'S'), card('A', 'H'), card('A', 'C')]
+    const state = makeState({
+      currentTurn: 'host',
+      phase: 'PLAYER_TURN',
+      drawPhase: false,
+      players: [
+        { id: 'host', hand: [card('5', 'H'), card('6', 'C')], melds: [meldCards], isOpened: true },
+        { id: 'guest', hand: [], melds: [], isOpened: false },
+        { id: 'ai', hand: [], melds: [], isOpened: false },
+      ],
+    })
+    const next = gameReducer(state, { type: 'DISCARD', cardId: '5H' })
+    const host = next.players.find(p => p.id === 'host')!
+    expect(host.melds).toHaveLength(1)
+    expect(host.melds[0]).toHaveLength(3)
+    expect(host.hand).toHaveLength(1)
+    expect(host.hand[0].id).toBe('6C')
+  })
+})
+
+describe('TC-AI-DRAW — DRAW_FROM_DISCARD rejected when top card forms no meld', () => {
+  it('returns unchanged state when top discard cannot form a valid meld with AI hand', () => {
+    const state = makeState({
+      currentTurn: 'ai',
+      phase: 'AI_TURN',
+      drawPhase: true,
+      players: [
+        { id: 'host', hand: [], melds: [], isOpened: false },
+        { id: 'guest', hand: [], melds: [], isOpened: false },
+        { id: 'ai', hand: [card('2', 'H'), card('7', 'S'), card('K', 'C')], melds: [], isOpened: false },
+      ],
+      discardPile: [card('A', 'D')],
+    })
+    const next = gameReducer(state, { type: 'DRAW_FROM_DISCARD' })
+    expect(next).toBe(state)
+  })
+})
+
+// ─── Deck — shuffle ──────────────────────────────────────────────────────────
+
+describe('TC-DECK-SHUFFLE-1 — shuffle preserves all cards', () => {
+  it('returns a deck with the same 52 cards in a different order', () => {
+    const deck = createDeck()
+    const shuffled = shuffle(deck)
+    expect(shuffled).toHaveLength(deck.length)
+    const sortById = (a: Card, b: Card) => a.id.localeCompare(b.id)
+    expect([...shuffled].sort(sortById)).toEqual([...deck].sort(sortById))
+  })
+})
+
+describe('TC-DECK-SHUFFLE-2 — shuffle returns a new array', () => {
+  it('does not mutate or return the original array reference', () => {
+    const deck = createDeck()
+    const shuffled = shuffle(deck)
+    expect(shuffled).not.toBe(deck)
+  })
+})
+
+describe('TC-DECK-SHUFFLE-3 — shuffle produces different orderings', () => {
+  it('two independent shuffles of a 52-card deck are rarely identical', () => {
+    const deck = createDeck()
+    const a = shuffle(deck)
+    const b = shuffle(deck)
+    const same = a.every((c, i) => c.id === b[i].id)
+    expect(same).toBe(false)
+  })
+})
+
+// ─── Melds — canExtendMeld ───────────────────────────────────────────────────
+
+describe('TC-MELD-EXT-1 — canExtendMeld rejects empty meld', () => {
+  it('returns false for an empty meld', () => {
+    expect(canExtendMeld(card('A', 'S'), [])).toBe(false)
+  })
+})
+
+describe('TC-MELD-EXT-2 — canExtendMeld extends a set', () => {
+  it('accepts a card of the same rank with a new suit', () => {
+    const meld = [card('7', 'S'), card('7', 'H'), card('7', 'D')]
+    expect(canExtendMeld(card('7', 'C'), meld)).toBe(true)
+  })
+})
+
+describe('TC-MELD-EXT-3 — canExtendMeld rejects wrong rank for set', () => {
+  it('returns false when card rank does not match the set', () => {
+    const meld = [card('7', 'S'), card('7', 'H'), card('7', 'D')]
+    expect(canExtendMeld(card('8', 'C'), meld)).toBe(false)
+  })
+})
+
+describe('TC-MELD-EXT-4 — canExtendMeld rejects duplicate suit in set', () => {
+  it('returns false when the suit is already present in the set', () => {
+    const meld = [card('7', 'S'), card('7', 'H'), card('7', 'D')]
+    expect(canExtendMeld(card('7', 'D'), meld)).toBe(false)
+  })
+})
+
+describe('TC-MELD-EXT-5 — canExtendMeld rejects extending a full set', () => {
+  it('returns false when set already has 4 cards', () => {
+    const meld = [card('7', 'S'), card('7', 'H'), card('7', 'D'), card('7', 'C')]
+    expect(canExtendMeld(card('7', 'S'), meld)).toBe(false)
+  })
+})
+
+describe('TC-MELD-EXT-6 — canExtendMeld extends a sequence on the low end', () => {
+  it('accepts a card one rank below the lowest in the sequence', () => {
+    const meld = [card('5', 'H'), card('6', 'H'), card('7', 'H')]
+    expect(canExtendMeld(card('4', 'H'), meld)).toBe(true)
+  })
+})
+
+describe('TC-MELD-EXT-7 — canExtendMeld extends a sequence on the high end', () => {
+  it('accepts a card one rank above the highest in the sequence', () => {
+    const meld = [card('5', 'H'), card('6', 'H'), card('7', 'H')]
+    expect(canExtendMeld(card('8', 'H'), meld)).toBe(true)
+  })
+})
+
+describe('TC-MELD-EXT-8 — canExtendMeld rejects wrong suit for sequence', () => {
+  it('returns false when card suit does not match the sequence', () => {
+    const meld = [card('5', 'H'), card('6', 'H'), card('7', 'H')]
+    expect(canExtendMeld(card('8', 'S'), meld)).toBe(false)
+  })
+})
+
+describe('TC-MELD-EXT-9 — canExtendMeld rejects non-adjacent card for sequence', () => {
+  it('returns false when card does not connect to either end', () => {
+    const meld = [card('5', 'H'), card('6', 'H'), card('7', 'H')]
+    expect(canExtendMeld(card('9', 'H'), meld)).toBe(false)
   })
 })

@@ -1,21 +1,20 @@
 import { useState } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { useGameStore } from '../store/gameStore'
 import { useUIStore } from '../store/uiStore'
 import { useGame } from '../hooks/useGame'
 import type { usePeer } from '../hooks/usePeer'
-import { isValidMeld } from '../game/melds'
+import { isValidMeld, canExtendMeld, handTotal, getCardValue, detectMelds } from '../game/melds'
 import type { PlayerId } from '../game/engine'
 import type { Card } from '../game/deck'
 import Hand from './Hand'
 import CardStack from './CardStack'
 import MeldZone from './MeldZone'
+import CardComponent from './Card'
 import DiscardPile from './DiscardPile'
 import StockPile from './StockPile'
 import ActionBar from './ActionBar'
-import CardComponent from './Card'
-
-const RANK_ORDER_DESC = ['K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', 'A'] as const
-const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' }
+import DiscardHistoryModal from './DiscardHistoryModal'
 
 type Props = {
   peer: ReturnType<typeof usePeer>
@@ -27,6 +26,7 @@ export default function Board({ peer }: Props) {
   const selectedCardIds = useUIStore(s => s.selectedCardIds)
   const toggleCardSelection = useUIStore(s => s.toggleCardSelection)
   const hasDrawnThisTurnRaw = useUIStore(s => s.hasDrawnThisTurn)
+  const highlightedPile = useUIStore(s => s.highlightedPile)
   const [showDiscardHistory, setShowDiscardHistory] = useState(false)
   const hasDrawnThisTurn = hasDrawnThisTurnRaw || game.dealerFirstTurn
 
@@ -38,7 +38,7 @@ export default function Board({ peer }: Props) {
     groupSelection,
     sapaw,
     callDraw,
-    nextRound,
+    voteNextRound,
     autoMeld,
     pendingMeldGroups,
     discardTopFormsMeld,
@@ -79,6 +79,16 @@ export default function Board({ peer }: Props) {
   const canSapaw = isMyTurn && hasDrawnThisTurn
     && selectedCardIds.length === 1 && !pendingIds.has(selectedCardIds[0])
 
+  // Sapaw hints
+  const allOpponentMelds = [...opponent.melds, ...ai.melds]
+  const sapawableCardIds = (isMyTurn && hasDrawnThisTurn)
+    ? me.hand.filter(c => !pendingIds.has(c.id) && allOpponentMelds.some(m => canExtendMeld(c, m))).map(c => c.id)
+    : []
+  const selectedCard = canSapaw ? me.hand.find(c => c.id === selectedCardIds[0]) : null
+  const opponentHighlightedMelds = selectedCard ? new Set(opponent.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : [])) : undefined
+  const aiHighlightedMelds = selectedCard ? new Set(ai.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : [])) : undefined
+  const myHighlightedMelds = selectedCard ? new Set(me.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : [])) : undefined
+
   // Dump: only allow dumping a free card (not one in a pending group)
   const dumpCardId = selectedCardIds.filter(id => !pendingIds.has(id)).at(-1) ?? null
 
@@ -115,12 +125,13 @@ export default function Board({ peer }: Props) {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex flex-col h-screen w-screen bg-[#0d2d3e] text-white overflow-hidden">
 
       {/* ── Top strip: opponent avatars ── */}
       <div className="flex flex-row justify-between items-center px-6 py-2 shrink-0 border-b border-white/10 bg-black/20" data-testid="section-opponents">
         <CardStack count={opponent.hand.length} label={opponentLabel} />
-        <CardStack count={ai.hand.length} label="AI" />
+        <CardStack count={ai.hand.length} label="AI" isActive={game.phase === 'AI_TURN'} />
       </div>
 
       {/* ── Middle row: opponent melds | stock+discard | AI melds ── */}
@@ -134,6 +145,7 @@ export default function Board({ peer }: Props) {
               label={opponentLabel}
               size="hand"
               onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], opponentId, i) : undefined}
+              highlightedMeldIndices={canSapaw ? opponentHighlightedMelds : undefined}
             />
           ) : (
             <span className="text-gray-600 text-xs italic uppercase tracking-widest">Drop Area</span>
@@ -146,12 +158,14 @@ export default function Board({ peer }: Props) {
             count={game.stock.length}
             onClick={canDraw && game.stock.length > 0 ? drawFromStock : undefined}
             canDraw={canDraw && game.stock.length > 0}
+            isAiHighlighted={highlightedPile === 'stock'}
           />
           <DiscardPile
             pile={game.discardPile}
             onClick={canDraw && discardTopFormsMeld ? drawFromDiscard : undefined}
             canDraw={canDraw && discardTopFormsMeld}
             onViewHistory={() => setShowDiscardHistory(true)}
+            isAiHighlighted={highlightedPile === 'discard'}
           />
         </div>
 
@@ -163,6 +177,7 @@ export default function Board({ peer }: Props) {
               label="AI"
               size="hand"
               onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], 'ai', i) : undefined}
+              highlightedMeldIndices={canSapaw ? aiHighlightedMelds : undefined}
             />
           ) : (
             <span className="text-gray-600 text-xs italic uppercase tracking-widest">Drop Area</span>
@@ -178,6 +193,7 @@ export default function Board({ peer }: Props) {
             label="My Melds"
             size="meld"
             onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], myId, i) : undefined}
+            highlightedMeldIndices={canSapaw ? myHighlightedMelds : undefined}
           />
         ) : (
           <span className="text-gray-600 text-xs italic px-4 uppercase tracking-widest">Drop Area</span>
@@ -214,6 +230,7 @@ export default function Board({ peer }: Props) {
           faceUp={true}
           selectedCardIds={selectedCardIds}
           pendingMeldGroups={pendingMeldGroups}
+          sapawableCardIds={sapawableCardIds}
           onCardClick={handleMyCardClick}
           label="My Hand"
           onDump={isMyTurn && hasDrawnThisTurn && !!dumpCardId ? handleDump : undefined}
@@ -224,79 +241,107 @@ export default function Board({ peer }: Props) {
 
       {/* ── Discard History modal ── */}
       {showDiscardHistory && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
-          onClick={() => setShowDiscardHistory(false)}
-        >
-          <div
-            className="bg-[#0a1f2b] rounded-2xl p-6 border border-white/20 flex flex-col gap-5 max-h-[90vh] overflow-y-auto min-w-96"
-            onClick={e => e.stopPropagation()}
-            data-testid="modal-discard-history"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-white font-bold text-lg">Discarded Cards</h2>
-              <button
-                onClick={() => setShowDiscardHistory(false)}
-                className="text-white/50 hover:text-white text-xl leading-none"
-                data-testid="btn-close-discard-history"
-              >✕</button>
-            </div>
-            {(['S', 'H', 'D', 'C'] as const).map(suit => {
-              const suitCards = game.discardPile
-                .filter(c => c.suit === suit)
-                .sort((a, b) => RANK_ORDER_DESC.indexOf(a.rank) - RANK_ORDER_DESC.indexOf(b.rank))
-              return (
-                <div key={suit} className="flex items-center gap-3">
-                  <span className={`text-xl font-bold w-6 shrink-0 ${suit === 'H' || suit === 'D' ? 'text-red-500' : 'text-white'}`}>
-                    {SUIT_SYMBOL[suit]}
-                  </span>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {suitCards.length === 0
-                      ? <span className="text-white/20 text-sm italic self-center">—</span>
-                      : suitCards.map(card => (
-                          <div key={card.id} className="shrink-0">
-                            <CardComponent card={card} faceUp size="hand" />
-                          </div>
-                        ))
-                    }
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <DiscardHistoryModal
+          discardPile={game.discardPile}
+          onClose={() => setShowDiscardHistory(false)}
+        />
       )}
 
       {/* ── Round End overlay ── */}
       {game.phase === 'ROUND_END' && game.roundResult && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#0a1f2b] rounded-2xl p-8 border border-white/20 flex flex-col items-center gap-6 min-w-72" data-testid="modal-round-end">
-            <h2 className="text-4xl font-black text-yellow-400" data-testid="round-end-title">
-              {game.roundResult.reason === 'tongit' ? 'TONGIT!' : 'ROUND OVER'}
-            </h2>
-            <p className="text-white text-lg" data-testid="round-end-result">
-              Winner: <span className="font-bold capitalize">{game.roundResult.winner}</span>
-              {' '}·{' '}
-              <span className="text-white/60 capitalize">{game.roundResult.reason}</span>
-            </p>
-            <div className="flex flex-col gap-1 text-sm w-full" data-testid="round-end-scores">
-              {Object.entries(game.roundResult.totals).map(([pid, total]) => (
-                <div key={pid} className="flex justify-between">
-                  <span className="capitalize text-white/60">{pid}</span>
-                  <span className="font-bold text-white/80">{total} pts</span>
-                </div>
-              ))}
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0a1f2b] rounded-2xl p-5 border border-white/20 flex flex-col items-center gap-4 w-full max-w-5xl" data-testid="modal-round-end">
+            {/* Header row */}
+            <div className="flex items-center gap-4 w-full justify-between">
+              <h2 className="text-3xl font-black text-yellow-400" data-testid="round-end-title">
+                {game.roundResult.reason === 'tongit' ? 'TONGIT!' : 'ROUND OVER'}
+              </h2>
+              <p className="text-white text-base" data-testid="round-end-result">
+                Winner: <span className="font-bold capitalize">{game.roundResult.winner}</span>
+                {' '}·{' '}
+                <span className="text-white/60 capitalize">{game.roundResult.reason}</span>
+              </p>
+              <div className="flex flex-col items-end gap-1">
+                {(() => {
+                  const votes = game.nextRoundVotes ?? []
+                  const myVote = votes.includes(myId)
+                  const hostVoted = votes.includes('host')
+                  const guestVoted = votes.includes('guest')
+                  return <>
+                    <button
+                      onClick={myVote ? undefined : voteNextRound}
+                      disabled={myVote}
+                      className={`px-6 py-2 rounded-xl text-white font-bold text-lg transition-colors ${myVote ? 'bg-gray-600 cursor-not-allowed opacity-60' : 'bg-green-700 hover:bg-green-600'}`}
+                      data-testid="btn-next-round"
+                    >
+                      {myVote ? 'Ready!' : 'Next Round'}
+                    </button>
+                    <div className="flex gap-3 text-sm">
+                      <span className={hostVoted ? 'text-green-400' : 'text-white/40'}>{hostVoted ? '✓' : '○'} Host</span>
+                      <span className={guestVoted ? 'text-green-400' : 'text-white/40'}>{guestVoted ? '✓' : '○'} Guest</span>
+                    </div>
+                  </>
+                })()}</div>
             </div>
-            <button
-              onClick={nextRound}
-              className="px-8 py-3 bg-green-700 hover:bg-green-600 rounded-xl text-white font-bold text-xl transition-colors"
-              data-testid="btn-next-round"
-            >
-              Next Round
-            </button>
+
+            {/* 3-column player reveal */}
+            <div className="grid grid-cols-3 gap-3 w-full" data-testid="round-end-scores">
+              {game.players.map(p => {
+                const total = game.roundResult!.totals[p.id] ?? 0
+                const isWinner = p.id === game.roundResult!.winner
+                const secretMelds = detectMelds(p.hand)
+                const secretMeldIds = new Set(secretMelds.flat().map(c => c.id))
+                const unmatchedCards = [...p.hand]
+                  .filter(c => !secretMeldIds.has(c.id))
+                  .sort((a, b) => getCardValue(b.rank) - getCardValue(a.rank))
+                return (
+                  <div key={p.id} className={`rounded-xl p-3 border ${isWinner ? 'border-yellow-400/60 bg-yellow-400/5' : 'border-white/10 bg-white/5'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`text-base font-bold capitalize ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                        {p.id} {isWinner ? '🏆' : ''}
+                      </span>
+                      <span className="text-white/80 font-bold text-sm">{total} pts</span>
+                    </div>
+
+                    {/* Exposed melds */}
+                    {p.melds.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-[10px] text-white/40 uppercase tracking-wide mb-1">Melds</p>
+                        <MeldZone melds={p.melds} label="" size="meld" />
+                      </div>
+                    )}
+
+                    {/* Secret sets (held in hand, not counted) */}
+                    {secretMelds.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-[10px] text-white/40 uppercase tracking-wide mb-1">Secret Melds <span className="text-white/30">(0 pts)</span></p>
+                        <MeldZone melds={secretMelds} label="" size="meld" />
+                      </div>
+                    )}
+
+                    {/* Unmatched hand */}
+                    <div>
+                      <p className="text-[10px] text-white/40 uppercase tracking-wide mb-1">
+                        Unmatched — {unmatchedCards.length} cards · {handTotal(unmatchedCards)} pts
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {unmatchedCards.map(c => (
+                          <div key={c.id} className="flex flex-col items-center gap-0.5">
+                            <CardComponent card={c} faceUp size="meld" />
+                            <span className="text-[9px] text-white/50 font-bold">{getCardValue(c.rank)}</span>
+                          </div>
+                        ))}
+                        {unmatchedCards.length === 0 && <span className="text-white/30 text-xs italic">none</span>}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
     </div>
+    </MotionConfig>
   )
 }

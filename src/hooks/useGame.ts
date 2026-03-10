@@ -11,9 +11,9 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
   const setHasDrawnThisTurn = useUIStore(s => s.setHasDrawnThisTurn)
   const clearCardSelection = useUIStore(s => s.clearCardSelection)
   const groupSelection = useUIStore(s => s.groupSelection)
-  const clearPendingMelds = useUIStore(s => s.clearPendingMelds)
-  const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
+const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
   const addPendingMeld = useUIStore(s => s.addPendingMeld)
+  const setHighlightedPile = useUIStore(s => s.setHighlightedPile)
   const pendingMeldGroups = useUIStore(s => s.pendingMeldGroups)
   const selectedCardIds = useUIStore(s => s.selectedCardIds)
   const hasDrawnThisTurn = useUIStore(s => s.hasDrawnThisTurn) || game.dealerFirstTurn
@@ -33,10 +33,9 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
     if (game.currentTurn !== prevTurn.current) {
       setHasDrawnThisTurn(false)
       clearCardSelection()
-      clearPendingMelds()
       prevTurn.current = game.currentTurn
     }
-  }, [game.currentTurn, setHasDrawnThisTurn, clearCardSelection, clearPendingMelds])
+  }, [game.currentTurn, setHasDrawnThisTurn, clearCardSelection])
 
   // AI turn automation
   useEffect(() => {
@@ -46,10 +45,16 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
       const ai = game.players.find(p => p.id === 'ai')
       if (!ai) return
 
-      // Draw: prefer discard pile, fall back to stock
-      if (game.discardPile.length > 0) {
+      // Draw: prefer discard pile only if top card can form a valid meld
+      const topDiscard = game.discardPile[0]
+      const canDrawDiscard = topDiscard && detectMelds([...ai.hand, topDiscard]).some(m =>
+        m.some(c => c.id === topDiscard.id)
+      )
+      if (canDrawDiscard) {
+        setHighlightedPile('discard')
         dispatch({ type: 'DRAW_FROM_DISCARD' })
       } else {
+        setHighlightedPile('stock')
         dispatch({ type: 'DRAW_FROM_STOCK' })
       }
 
@@ -74,12 +79,14 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
 
         // Discard highest-value card
         const cardToDiscard = findBestDiscard(afterMeldAi.hand)
+        setHighlightedPile('discard')
         dispatch({ type: 'DISCARD', cardId: cardToDiscard.id })
+        setTimeout(() => setHighlightedPile(null), 600)
       }, 400)
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [game.phase, game.currentTurn, game.players, game.discardPile, dispatch])
+  }, [game.phase, game.currentTurn, game.players, game.discardPile, dispatch, setHighlightedPile])
 
   function drawFromStock() {
     if (role !== game.currentTurn) return
@@ -97,7 +104,6 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
     if (role !== game.currentTurn) return
     sendAction({ type: 'DISCARD', cardId })
     clearCardSelection()
-    clearPendingMelds()
     setHasDrawnThisTurn(false)
   }
 
@@ -132,10 +138,24 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
     sendAction({ type: 'CALL_DRAW', playerId: role })
   }
 
-  function nextRound() {
-    sendAction({ type: 'NEXT_ROUND' })
-    clearPendingMelds()
+  function voteNextRound() {
+    if (role === 'guest') {
+      sendAction({ type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    } else {
+      dispatch({ type: 'VOTE_NEXT_ROUND', playerId: 'host' })
+      if (!role) {
+        // solo mode — no real guest, auto-vote guest too
+        dispatch({ type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+      }
+    }
   }
+
+  // AI auto-vote when round ends (host/solo only)
+  useEffect(() => {
+    if (game.phase !== 'ROUND_END') return
+    if (role === 'guest') return
+    dispatch({ type: 'VOTE_NEXT_ROUND', playerId: 'ai' })
+  }, [game.phase, role, dispatch])
 
   function autoMeld() {
     if (!role || role !== game.currentTurn) return
@@ -153,7 +173,7 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
     }
   }
 
-  const topDiscard = game.discardPile[game.discardPile.length - 1]
+  const topDiscard = game.discardPile[0]
   const mePlayer = game.players.find(p => p.id === (role ?? 'host'))
   const discardTopFormsMeld = !!(topDiscard && mePlayer &&
     detectMelds([...mePlayer.hand, topDiscard]).some(m => m.some(c => c.id === topDiscard.id))
@@ -167,7 +187,7 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
     groupSelection,
     sapaw,
     callDraw,
-    nextRound,
+    voteNextRound,
     autoMeld,
     selectedCardIds,
     pendingMeldGroups,

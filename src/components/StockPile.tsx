@@ -1,20 +1,25 @@
+import { AnimatePresence, motion } from 'framer-motion'
+
 type Props = {
   count: number
   onClick?: () => void
   canDraw?: boolean
+  isAiHighlighted?: boolean
 }
 
-export default function StockPile({ count, onClick, canDraw = false }: Props) {
+export default function StockPile({ count, onClick, canDraw = false, isAiHighlighted = false }: Props) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <div
+      <motion.div
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onClick={onClick}
         onKeyDown={onClick ? e => e.key === 'Enter' && onClick?.() : undefined}
+        whileTap={onClick ? { scale: 0.92 } : undefined}
         className={`
           relative w-28 h-40 rounded-lg select-none
           ${canDraw ? 'cursor-pointer' : 'cursor-default'}
+          ${isAiHighlighted ? 'ring-2 ring-indigo-400/80' : ''}
         `}
         data-testid="btn-draw-stock"
         data-can-draw={canDraw}
@@ -40,9 +45,20 @@ export default function StockPile({ count, onClick, canDraw = false }: Props) {
             <span className="text-gray-600 text-xs">Empty</span>
           </div>
         )}
-      </div>
-      {/* Count below */}
-      <span className="text-white text-sm font-bold">{count}</span>
+      </motion.div>
+      {/* Count below — animates on change */}
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={count}
+          initial={{ y: -8, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 8, opacity: 0, transition: { duration: 0.1 } }}
+          transition={{ duration: 0.2 }}
+          className="text-white text-sm font-bold"
+        >
+          {count}
+        </motion.span>
+      </AnimatePresence>
     </div>
   )
 }

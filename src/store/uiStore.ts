@@ -13,6 +13,8 @@ type UIStore = {
   setRole: (role: 'host' | 'guest' | null) => void
   hasDrawnThisTurn: boolean
   setHasDrawnThisTurn: (val: boolean) => void
+  highlightedPile: 'stock' | 'discard' | null
+  setHighlightedPile: (pile: 'stock' | 'discard' | null) => void
 }
 
 export const useUIStore = create<UIStore>(set => ({
@@ -40,4 +42,6 @@ export const useUIStore = create<UIStore>(set => ({
   setRole: (role: 'host' | 'guest' | null) => set({ role }),
   hasDrawnThisTurn: false,
   setHasDrawnThisTurn: (val: boolean) => set({ hasDrawnThisTurn: val }),
+  highlightedPile: null,
+  setHighlightedPile: (pile: 'stock' | 'discard' | null) => set({ highlightedPile: pile }),
 }))
