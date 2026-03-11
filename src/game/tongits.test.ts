@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createDeck, deal, shuffle } from './deck'
 import type { Card, Rank, Suit } from './deck'
-import { getCardValue, handTotal, isValidMeld, canExtendMeld, detectMelds } from './melds'
+import { getCardValue, handTotal, isValidMeld, canExtendMeld, detectMelds, RANK_ORDER } from './melds'
 import {
   gameReducer,
   initialGameState,
@@ -2497,5 +2497,45 @@ describe('TC-NET-5 — START_GAME solo mode uses only hostName', () => {
     expect(state.playerNames.bot1).toBe('Bot 1')
     expect(state.playerNames.bot2).toBe('Bot 2')
     expect(state.gameMode).toBe('solo')
+  })
+})
+
+// ─── Meld Display Sorting ─────────────────────────────────────────────────────
+
+describe('TC-MELD-SORT-1 — RANK_ORDER sorts a run lowest to highest', () => {
+  it('sorts an out-of-order run correctly', () => {
+    const meld = [card('7', 'H'), card('5', 'H'), card('6', 'H')]
+    const sorted = [...meld].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
+    expect(sorted.map(c => c.rank)).toEqual(['5', '6', '7'])
+  })
+
+  it('preserves already-sorted runs', () => {
+    const meld = [card('3', 'S'), card('4', 'S'), card('5', 'S')]
+    const sorted = [...meld].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
+    expect(sorted.map(c => c.rank)).toEqual(['3', '4', '5'])
+  })
+
+  it('sorts a run containing face cards (J, Q, K) correctly', () => {
+    const meld = [card('K', 'D'), card('J', 'D'), card('Q', 'D')]
+    const sorted = [...meld].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
+    expect(sorted.map(c => c.rank)).toEqual(['J', 'Q', 'K'])
+  })
+})
+
+describe('TC-MELD-SORT-2 — RANK_ORDER sorts a set stably', () => {
+  it('all same-rank cards stay at the same relative rank index', () => {
+    const meld = [card('10', 'S'), card('10', 'H'), card('10', 'D')]
+    const sorted = [...meld].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
+    // All ranks equal — order may vary but all should be '10'
+    expect(sorted.every(c => c.rank === '10')).toBe(true)
+  })
+})
+
+describe('TC-MELD-SORT-3 — RANK_ORDER does not mutate the original array', () => {
+  it('spread before sort leaves original intact', () => {
+    const meld = [card('8', 'C'), card('6', 'C'), card('7', 'C')]
+    const original = meld.map(c => c.rank)
+    const _sorted = [...meld].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
+    expect(meld.map(c => c.rank)).toEqual(original)
   })
 })
