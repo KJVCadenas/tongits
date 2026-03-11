@@ -1,13 +1,15 @@
 import Peer, { type DataConnection } from 'peerjs'
 import type { NetworkMessage } from './types'
-import type { GameState, GameAction } from '../game/engine'
+import type { GameState, GameAction, PlayerId, GameMode } from '../game/engine'
 import { peerIdFromCode, isValidCode } from './roomCode'
 
 export type GuestCallbacks = {
   onConnected: () => void
+  onAssigned: (playerId: PlayerId) => void
   onDisconnected: () => void
   onError: () => void
   onSnapshot: (state: GameState) => void
+  onLobbySnapshot: (gameMode: GameMode, hostName: string, guestNames: Partial<Record<PlayerId, string>>, guestReady: Partial<Record<PlayerId, boolean>>) => void
 }
 
 export class GameGuest {
@@ -19,7 +21,7 @@ export class GameGuest {
     this.callbacks = callbacks
   }
 
-  connect(roomCode: string) {
+  connect(roomCode: string, name: string) {
     const normalized = roomCode.toUpperCase().trim()
     if (!isValidCode(normalized)) {
       this.callbacks.onError()
@@ -32,13 +34,20 @@ export class GameGuest {
       this.conn = conn
 
       conn.on('open', () => {
+        // Immediately send our name so host can assign us a slot
+        const msg: NetworkMessage = { type: 'PLAYER_JOIN', name }
+        conn.send(msg)
         this.callbacks.onConnected()
       })
 
       conn.on('data', (raw: unknown) => {
         const msg = raw as NetworkMessage
-        if (msg.type === 'STATE_SNAPSHOT') {
+        if (msg.type === 'PLAYER_ASSIGNMENT') {
+          this.callbacks.onAssigned(msg.playerId)
+        } else if (msg.type === 'STATE_SNAPSHOT') {
           this.callbacks.onSnapshot(msg.state)
+        } else if (msg.type === 'LOBBY_SNAPSHOT') {
+          this.callbacks.onLobbySnapshot(msg.gameMode, msg.hostName, msg.guestNames, msg.guestReady)
         }
       })
 
@@ -59,6 +68,13 @@ export class GameGuest {
   sendIntent(action: GameAction) {
     if (this.conn?.open) {
       const msg: NetworkMessage = { type: 'ACTION_INTENT', action }
+      this.conn.send(msg)
+    }
+  }
+
+  sendReady(playerId: PlayerId, ready: boolean) {
+    if (this.conn?.open) {
+      const msg: NetworkMessage = { type: 'GUEST_READY', playerId, ready }
       this.conn.send(msg)
     }
   }

@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Card as CardType } from '../game/deck'
+import { RANK_ORDER } from '../game/melds'
 import Card from './Card'
 
 type Props = {
@@ -17,6 +18,7 @@ export default function MeldZone({ melds, label: _label, size = 'meld', onMeldCl
         {melds.map((meld, i) => {
           const isHighlighted = highlightedMeldIndices?.has(i)
           const isDimmed = onMeldClick && highlightedMeldIndices && !isHighlighted
+          const sortedMeld = [...meld].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
           return (
           <motion.div
             key={i}
@@ -32,7 +34,7 @@ export default function MeldZone({ melds, label: _label, size = 'meld', onMeldCl
             data-testid="meld"
             data-meld-index={i}
           >
-            {meld.map((card, ci) => (
+            {sortedMeld.map((card, ci) => (
               <motion.div key={card.id} layout className={ci === 0 ? '' : '-ml-1'} data-card-state="melded">
                 <Card card={card} faceUp={true} size={size} />
               </motion.div>

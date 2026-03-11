@@ -5,7 +5,7 @@ import { useUIStore } from '../store/uiStore'
 import { useGame } from '../hooks/useGame'
 import type { usePeer } from '../hooks/usePeer'
 import { isValidMeld, canExtendMeld, handTotal, getCardValue, detectMelds } from '../game/melds'
-import type { PlayerId } from '../game/engine'
+import type { GameMode, PlayerId } from '../game/engine'
 import type { Card } from '../game/deck'
 import Hand from './Hand'
 import CardStack from './CardStack'
@@ -18,6 +18,12 @@ import DiscardHistoryModal from './DiscardHistoryModal'
 
 type Props = {
   peer: ReturnType<typeof usePeer>
+}
+
+function humanPlayersForMode(mode: GameMode): PlayerId[] {
+  if (mode === 'solo') return ['host']
+  if (mode === 'duo') return ['host', 'guest']
+  return ['host', 'guest', 'guest2']
 }
 
 export default function Board({ peer }: Props) {
@@ -42,7 +48,7 @@ export default function Board({ peer }: Props) {
     autoMeld,
     pendingMeldGroups,
     discardTopFormsMeld,
-  } = useGame(role === 'guest' ? peer.sendIntent : undefined)
+  } = useGame((role === 'guest' || role === 'guest2') ? peer.sendIntent : undefined)
 
   const [sortedHand, setSortedHand] = useState<Card[] | null>(null)
 
@@ -58,14 +64,13 @@ export default function Board({ peer }: Props) {
       ]
     : me.hand
 
-  const opponentId: PlayerId = myId === 'host' ? 'guest' : 'host'
-  const opponentLabel = opponentId === 'host' ? 'Host' : 'Guest'
-
-  const opponent = game.players.find(p => p.id === opponentId)!
-  const ai = game.players.find(p => p.id === 'ai')!
+  // Always exactly 2 opponents; left = opponents[0], right = opponents[1]
+  const opponents = game.players.filter(p => p.id !== myId)
+  const leftOpponent = opponents[0]
+  const rightOpponent = opponents[1]
 
   const isMyTurn = game.currentTurn === myId
-  const isActive = game.phase === 'PLAYER_TURN' || game.phase === 'AI_TURN'
+  const isActive = game.phase === 'PLAYER_TURN' || game.phase === 'BOT_TURN'
   const canDraw = isMyTurn && isActive && !hasDrawnThisTurnRaw && !game.dealerFirstTurn
 
   const pendingIds = new Set(pendingMeldGroups.flat())
@@ -80,14 +85,20 @@ export default function Board({ peer }: Props) {
     && selectedCardIds.length === 1 && !pendingIds.has(selectedCardIds[0])
 
   // Sapaw hints
-  const allOpponentMelds = [...opponent.melds, ...ai.melds]
+  const allOpponentMelds = [...(leftOpponent?.melds ?? []), ...(rightOpponent?.melds ?? [])]
   const sapawableCardIds = (isMyTurn && hasDrawnThisTurn)
     ? me.hand.filter(c => !pendingIds.has(c.id) && allOpponentMelds.some(m => canExtendMeld(c, m))).map(c => c.id)
     : []
   const selectedCard = canSapaw ? me.hand.find(c => c.id === selectedCardIds[0]) : null
-  const opponentHighlightedMelds = selectedCard ? new Set(opponent.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : [])) : undefined
-  const aiHighlightedMelds = selectedCard ? new Set(ai.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : [])) : undefined
-  const myHighlightedMelds = selectedCard ? new Set(me.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : [])) : undefined
+  const leftHighlightedMelds = selectedCard
+    ? new Set(leftOpponent?.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : []) ?? [])
+    : undefined
+  const rightHighlightedMelds = selectedCard
+    ? new Set(rightOpponent?.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : []) ?? [])
+    : undefined
+  const myHighlightedMelds = selectedCard
+    ? new Set(me.melds.flatMap((m, i) => canExtendMeld(selectedCard, m) ? [i] : []))
+    : undefined
 
   // Dump: only allow dumping a free card (not one in a pending group)
   const dumpCardId = selectedCardIds.filter(id => !pendingIds.has(id)).at(-1) ?? null
@@ -130,22 +141,34 @@ export default function Board({ peer }: Props) {
 
       {/* ── Top strip: opponent avatars ── */}
       <div className="flex flex-row justify-between items-center px-6 py-2 shrink-0 border-b border-white/10 bg-black/20" data-testid="section-opponents">
-        <CardStack count={opponent.hand.length} label={opponentLabel} />
-        <CardStack count={ai.hand.length} label="AI" isActive={game.phase === 'AI_TURN'} />
+        {leftOpponent && (
+          <CardStack
+            count={leftOpponent.hand.length}
+            label={game.playerNames[leftOpponent.id]}
+            isActive={game.currentTurn === leftOpponent.id}
+          />
+        )}
+        {rightOpponent && (
+          <CardStack
+            count={rightOpponent.hand.length}
+            label={game.playerNames[rightOpponent.id]}
+            isActive={game.currentTurn === rightOpponent.id}
+          />
+        )}
       </div>
 
-      {/* ── Middle row: opponent melds | stock+discard | AI melds ── */}
+      {/* ── Middle row: left opponent melds | stock+discard | right opponent melds ── */}
       <div className="flex flex-row flex-1 min-h-0 items-center">
 
-        {/* Opponent meld zone */}
+        {/* Left opponent meld zone */}
         <div className="flex flex-col justify-center self-stretch flex-1 border-r border-white/10 bg-black/10 px-3 py-4 overflow-auto" data-testid="zone-opponent-melds">
-          {opponent.melds.length > 0 ? (
+          {leftOpponent && leftOpponent.melds.length > 0 ? (
             <MeldZone
-              melds={opponent.melds}
-              label={opponentLabel}
+              melds={leftOpponent.melds}
+              label={game.playerNames[leftOpponent.id]}
               size="hand"
-              onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], opponentId, i) : undefined}
-              highlightedMeldIndices={canSapaw ? opponentHighlightedMelds : undefined}
+              onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], leftOpponent.id, i) : undefined}
+              highlightedMeldIndices={canSapaw ? leftHighlightedMelds : undefined}
             />
           ) : (
             <span className="text-gray-600 text-xs italic uppercase tracking-widest">Drop Area</span>
@@ -169,15 +192,15 @@ export default function Board({ peer }: Props) {
           />
         </div>
 
-        {/* AI meld zone */}
+        {/* Right opponent meld zone */}
         <div className="flex flex-col justify-center self-stretch flex-1 border-l border-white/10 bg-black/10 px-3 py-4 overflow-auto" data-testid="zone-ai-melds">
-          {ai.melds.length > 0 ? (
+          {rightOpponent && rightOpponent.melds.length > 0 ? (
             <MeldZone
-              melds={ai.melds}
-              label="AI"
+              melds={rightOpponent.melds}
+              label={game.playerNames[rightOpponent.id]}
               size="hand"
-              onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], 'ai', i) : undefined}
-              highlightedMeldIndices={canSapaw ? aiHighlightedMelds : undefined}
+              onMeldClick={canSapaw ? (i) => sapaw(selectedCardIds[0], rightOpponent.id, i) : undefined}
+              highlightedMeldIndices={canSapaw ? rightHighlightedMelds : undefined}
             />
           ) : (
             <span className="text-gray-600 text-xs italic uppercase tracking-widest">Drop Area</span>
@@ -257,7 +280,7 @@ export default function Board({ peer }: Props) {
                 {game.roundResult.reason === 'tongit' ? 'TONGIT!' : 'ROUND OVER'}
               </h2>
               <p className="text-white text-base" data-testid="round-end-result">
-                Winner: <span className="font-bold capitalize">{game.roundResult.winner}</span>
+                Winner: <span className="font-bold">{game.playerNames[game.roundResult.winner]}</span>
                 {' '}·{' '}
                 <span className="text-white/60 capitalize">{game.roundResult.reason}</span>
               </p>
@@ -265,8 +288,7 @@ export default function Board({ peer }: Props) {
                 {(() => {
                   const votes = game.nextRoundVotes ?? []
                   const myVote = votes.includes(myId)
-                  const hostVoted = votes.includes('host')
-                  const guestVoted = votes.includes('guest')
+                  const humanPlayers = humanPlayersForMode(game.gameMode)
                   return <>
                     <button
                       onClick={myVote ? undefined : voteNextRound}
@@ -277,8 +299,14 @@ export default function Board({ peer }: Props) {
                       {myVote ? 'Ready!' : 'Next Round'}
                     </button>
                     <div className="flex gap-3 text-sm">
-                      <span className={hostVoted ? 'text-green-400' : 'text-white/40'}>{hostVoted ? '✓' : '○'} Host</span>
-                      <span className={guestVoted ? 'text-green-400' : 'text-white/40'}>{guestVoted ? '✓' : '○'} Guest</span>
+                      {humanPlayers.map(pid => {
+                        const voted = votes.includes(pid)
+                        return (
+                          <span key={pid} className={voted ? 'text-green-400' : 'text-white/40'}>
+                            {voted ? '✓' : '○'} {game.playerNames[pid]}
+                          </span>
+                        )
+                      })}
                     </div>
                   </>
                 })()}</div>
@@ -297,8 +325,8 @@ export default function Board({ peer }: Props) {
                 return (
                   <div key={p.id} className={`rounded-xl p-3 border ${isWinner ? 'border-yellow-400/60 bg-yellow-400/5' : 'border-white/10 bg-white/5'}`}>
                     <div className="flex justify-between items-center mb-2">
-                      <span className={`text-base font-bold capitalize ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
-                        {p.id} {isWinner ? '🏆' : ''}
+                      <span className={`text-base font-bold ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                        {game.playerNames[p.id]} {isWinner ? '🏆' : ''}
                       </span>
                       <span className="text-white/80 font-bold text-sm">{total} pts</span>
                     </div>

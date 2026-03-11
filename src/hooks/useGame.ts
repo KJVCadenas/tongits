@@ -11,7 +11,7 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
   const setHasDrawnThisTurn = useUIStore(s => s.setHasDrawnThisTurn)
   const clearCardSelection = useUIStore(s => s.clearCardSelection)
   const groupSelection = useUIStore(s => s.groupSelection)
-const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
+  const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
   const addPendingMeld = useUIStore(s => s.addPendingMeld)
   const setHighlightedPile = useUIStore(s => s.setHighlightedPile)
   const pendingMeldGroups = useUIStore(s => s.pendingMeldGroups)
@@ -37,17 +37,20 @@ const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
     }
   }, [game.currentTurn, setHasDrawnThisTurn, clearCardSelection])
 
-  // AI turn automation
+  // Bot turn automation (covers both bot1 and bot2)
   useEffect(() => {
-    if (game.phase !== 'AI_TURN' || game.currentTurn !== 'ai') return
+    if (game.phase !== 'BOT_TURN') return
+    const botId = game.currentTurn
+    const bot = game.players.find(p => p.id === botId)
+    if (!bot) return
 
     const timer = setTimeout(() => {
-      const ai = game.players.find(p => p.id === 'ai')
-      if (!ai) return
+      const currentBot = useGameStore.getState().game.players.find(p => p.id === botId)
+      if (!currentBot) return
 
       // Draw: prefer discard pile only if top card can form a valid meld
       const topDiscard = game.discardPile[0]
-      const canDrawDiscard = topDiscard && detectMelds([...ai.hand, topDiscard]).some(m =>
+      const canDrawDiscard = topDiscard && detectMelds([...currentBot.hand, topDiscard]).some(m =>
         m.some(c => c.id === topDiscard.id)
       )
       if (canDrawDiscard) {
@@ -61,24 +64,24 @@ const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
       // After draw: lay melds, then discard highest-value card
       setTimeout(() => {
         const updatedGame = useGameStore.getState().game
-        const updatedAi = updatedGame.players.find(p => p.id === 'ai')
-        if (!updatedAi || updatedAi.hand.length === 0) return
+        const updatedBot = updatedGame.players.find(p => p.id === botId)
+        if (!updatedBot || updatedBot.hand.length === 0) return
 
         // Lay all detected melds
-        const melds = detectMelds(updatedAi.hand)
+        const melds = detectMelds(updatedBot.hand)
         for (const meld of melds) {
-          dispatch({ type: 'LAY_MELD', playerId: 'ai', cardIds: meld.map(c => c.id) })
+          dispatch({ type: 'LAY_MELD', playerId: botId, cardIds: meld.map(c => c.id) })
         }
 
         // Read latest state after meld dispatches (Zustand set is synchronous)
         const afterMeldGame = useGameStore.getState().game
         if (afterMeldGame.phase === 'ROUND_END') return
 
-        const afterMeldAi = afterMeldGame.players.find(p => p.id === 'ai')
-        if (!afterMeldAi || afterMeldAi.hand.length === 0) return
+        const afterMeldBot = afterMeldGame.players.find(p => p.id === botId)
+        if (!afterMeldBot || afterMeldBot.hand.length === 0) return
 
         // Discard highest-value card
-        const cardToDiscard = findBestDiscard(afterMeldAi.hand)
+        const cardToDiscard = findBestDiscard(afterMeldBot.hand)
         setHighlightedPile('discard')
         dispatch({ type: 'DISCARD', cardId: cardToDiscard.id })
         setTimeout(() => setHighlightedPile(null), 600)
@@ -141,21 +144,24 @@ const setPendingMeldGroups = useUIStore(s => s.setPendingMeldGroups)
   function voteNextRound() {
     if (role === 'guest') {
       sendAction({ type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    } else if (role === 'guest2') {
+      sendAction({ type: 'VOTE_NEXT_ROUND', playerId: 'guest2' })
     } else {
+      // Host votes for themselves
       dispatch({ type: 'VOTE_NEXT_ROUND', playerId: 'host' })
-      if (!role) {
-        // solo mode — no real guest, auto-vote guest too
-        dispatch({ type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
-      }
     }
   }
 
-  // AI auto-vote when round ends (host/solo only)
+  // Bot auto-vote when round ends (host-side only — bots are always local)
   useEffect(() => {
     if (game.phase !== 'ROUND_END') return
-    if (role === 'guest') return
-    dispatch({ type: 'VOTE_NEXT_ROUND', playerId: 'ai' })
-  }, [game.phase, role, dispatch])
+    if (role === 'guest' || role === 'guest2') return
+    for (const p of game.players) {
+      if (p.id === 'bot1' || p.id === 'bot2') {
+        dispatch({ type: 'VOTE_NEXT_ROUND', playerId: p.id })
+      }
+    }
+  }, [game.phase, role, game.players, dispatch])
 
   function autoMeld() {
     if (!role || role !== game.currentTurn) return
