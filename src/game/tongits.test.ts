@@ -2539,3 +2539,107 @@ describe('TC-MELD-SORT-3 — RANK_ORDER does not mutate the original array', () 
     expect(meld.map(c => c.rank)).toEqual(original)
   })
 })
+
+// ─── Bug 3: VOTE_NEXT_ROUND routing fix ──────────────────────────────────────
+// The bug: usePeer.ts blocked guest VOTE_NEXT_ROUND because onActionIntent
+// checked currentTurn === fromPlayerId. During ROUND_END, currentTurn is the
+// last player who acted — NOT the guest. These tests confirm the reducer itself
+// is correct regardless of currentTurn, and document the exact scenario.
+
+describe('TC-BUG3-VOTE-1 — VOTE_NEXT_ROUND accepted regardless of currentTurn', () => {
+  it('guest vote is recorded even when currentTurn is host', () => {
+    // This exactly mirrors what happens after a round ends with host as last actor:
+    // currentTurn = 'host', but guest needs to vote to proceed.
+    const state = makeState({
+      gameMode: 'duo',
+      phase: 'ROUND_END',
+      currentTurn: 'host', // last player who acted — NOT the voter
+      roundResult: { winner: 'host', reason: 'stock', totals: { host: 0, bot1: 5, guest: 8 } },
+      nextRoundVotes: [],
+      players: [
+        { id: 'host', hand: [], melds: [], isOpened: true },
+        { id: 'bot1', hand: [card('5','S')], melds: [], isOpened: false },
+        { id: 'guest', hand: [card('8','S')], melds: [], isOpened: false },
+      ],
+      stock: [card('A','C')],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    // Reducer must accept the vote regardless of currentTurn
+    expect(next.nextRoundVotes).toContain('guest')
+    // Only guest voted; host hasn't — round stays in ROUND_END
+    expect(next.phase).toBe('ROUND_END')
+  })
+})
+
+describe('TC-BUG3-VOTE-2 — VOTE_NEXT_ROUND is idempotent', () => {
+  it('same player voting twice does not double-count or re-advance', () => {
+    const state = makeState({
+      gameMode: 'duo',
+      phase: 'ROUND_END',
+      roundResult: { winner: 'host', reason: 'tongit', totals: { host: 0, bot1: 5, guest: 8 } },
+      nextRoundVotes: ['guest'], // guest already voted
+    })
+    const next = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    expect(next).toEqual(state) // state unchanged — no double-count
+  })
+})
+
+describe('TC-BUG3-VOTE-3 — VOTE_NEXT_ROUND advances round after both humans vote', () => {
+  it('round starts when guest votes after host already voted, currentTurn was host', () => {
+    const state = makeState({
+      gameMode: 'duo',
+      phase: 'ROUND_END',
+      currentTurn: 'host',
+      roundResult: { winner: 'guest', reason: 'tongit', totals: { host: 10, bot1: 5, guest: 0 } },
+      nextRoundVotes: ['host'], // host already voted
+      players: [
+        { id: 'host', hand: [], melds: [], isOpened: true },
+        { id: 'bot1', hand: [], melds: [], isOpened: false },
+        { id: 'guest', hand: [], melds: [], isOpened: false },
+      ],
+      stock: [],
+      discardPile: [],
+    })
+    const next = gameReducer(state, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
+    expect(next.phase).not.toBe('ROUND_END')
+    expect(next.roundResult).toBeUndefined()
+    expect(next.nextRoundVotes).toBeUndefined()
+    // Guest won last round → guest is new dealer
+    expect(next.dealer).toBe('guest')
+  })
+})
+
+// ─── Bug 4: autoMeld pending-group extension ──────────────────────────────────
+// The bug: autoMeld() used detectMelds(freeCards) only. A single drawn card
+// that extends a pending 3-card group would not be detected as a meld on its
+// own. These tests document the pure-function gap and that canExtendMeld covers
+// the extension scenario correctly.
+
+describe('TC-BUG4-AUTOMELD-1 — detectMelds cannot find meld from a single card', () => {
+  it('returns empty when hand contains only one card (even if it could extend a group)', () => {
+    // Old autoMeld would call detectMelds([K♣]) after filtering out the 3-K pending group
+    expect(detectMelds([card('K', 'C')])).toHaveLength(0)
+  })
+})
+
+describe('TC-BUG4-AUTOMELD-2 — canExtendMeld detects the 4th King correctly', () => {
+  it('K♣ can extend a pending group of K♠ K♥ K♦', () => {
+    const pendingGroup = [card('K', 'S'), card('K', 'H'), card('K', 'D')]
+    const drawnCard = card('K', 'C')
+    // The fix: autoMeld uses canExtendMeld instead of relying on detectMelds alone
+    expect(canExtendMeld(drawnCard, pendingGroup)).toBe(true)
+  })
+})
+
+describe('TC-BUG4-AUTOMELD-3 — canExtendMeld correctly rejects invalid extensions', () => {
+  it('K♠ cannot extend K♠ K♥ K♦ (duplicate suit)', () => {
+    const pendingGroup = [card('K', 'S'), card('K', 'H'), card('K', 'D')]
+    expect(canExtendMeld(card('K', 'S'), pendingGroup)).toBe(false)
+  })
+
+  it('Q♣ cannot extend K♠ K♥ K♦ (wrong rank)', () => {
+    const pendingGroup = [card('K', 'S'), card('K', 'H'), card('K', 'D')]
+    expect(canExtendMeld(card('Q', 'C'), pendingGroup)).toBe(false)
+  })
+})
