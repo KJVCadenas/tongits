@@ -43,19 +43,22 @@ export default function Lobby({ peer }: Props) {
   const [guestName, setGuestName] = useState('Guest')
   const [gameMode, setGameMode] = useState<GameMode>('duo')
   const [roomCodeInput, setRoomCodeInput] = useState('')
+  const [isReady, setIsReady] = useState(false)
 
   const setRole = useUIStore(s => s.setRole)
   const dispatch = useGameStore(s => s.dispatch)
   const assignedRole = useUIStore(s => s.role)
-  const game = useGameStore(s => s.game)
 
   const {
     roomCode,
     guestsConnected,
     connectedGuestNames,
+    guestReadyState,
+    lobbyInfo,
     connectionStatus,
     startHost,
     joinAsGuest,
+    sendReady,
   } = peer
 
   const requiredGuests = gameMode === 'trio' ? 2 : 1
@@ -70,7 +73,7 @@ export default function Lobby({ peer }: Props) {
   function handleCreateRoom() {
     setRole('host')
     setView('hosting-waiting')
-    startHost()
+    startHost(hostName || 'Host', gameMode)
   }
 
   const handleCopyCode = useCallback(() => {
@@ -205,14 +208,15 @@ export default function Lobby({ peer }: Props) {
     const slot2Name: string = guestsConnected >= 1
       ? (connectedGuestNames['guest'] ?? 'Guest')
       : (gameMode === 'solo' ? 'Bot 1' : 'Waiting…')
-    const slot2Ready = gameMode === 'solo' || guestsConnected >= 1
+    const slot2Ready = gameMode === 'solo' || (guestsConnected >= 1 && guestReadyState['guest'] === true)
 
     const slot3Name: string = gameMode === 'trio'
       ? (guestsConnected >= 2 ? (connectedGuestNames['guest2' as PlayerId] ?? 'Guest 2') : 'Waiting…')
       : 'Bot 2'
-    const slot3Ready = gameMode !== 'trio' || guestsConnected >= 2
+    const slot3Ready = gameMode !== 'trio' || (guestsConnected >= 2 && guestReadyState['guest2' as PlayerId] === true)
 
-    const canStart = guestsConnected >= requiredGuests
+    const requiredGuestIds: PlayerId[] = gameMode === 'trio' ? ['guest', 'guest2'] : ['guest']
+    const canStart = guestsConnected >= requiredGuests && requiredGuestIds.every(id => guestReadyState[id] === true)
 
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-green-950 gap-8">
@@ -324,6 +328,26 @@ export default function Lobby({ peer }: Props) {
   // joining-waiting
   const mySlotLabel = assignedRole === 'guest2' ? 'Guest 2' : 'Guest'
 
+  // Build lobby slot display from lobbyInfo (synced from host)
+  const lobbyGameMode = lobbyInfo?.gameMode ?? 'duo'
+  const lobbyHostName = lobbyInfo?.hostName ?? 'Host'
+  const lobbyGuestNames = lobbyInfo?.guestNames ?? {}
+  const lobbyGuestReady = lobbyInfo?.guestReady ?? {}
+
+  const lobbySlot2Name: string = lobbyGameMode === 'solo'
+    ? 'Bot 1'
+    : (lobbyGuestNames['guest'] ?? (assignedRole === 'guest' ? guestName : 'Waiting…'))
+  const lobbySlot2Ready = lobbyGameMode === 'solo'
+    ? true
+    : (assignedRole === 'guest' ? isReady : (lobbyGuestReady['guest'] === true))
+
+  const lobbySlot3Name: string = lobbyGameMode === 'trio'
+    ? (lobbyGuestNames['guest2' as PlayerId] ?? (assignedRole === 'guest2' ? guestName : 'Waiting…'))
+    : 'Bot 2'
+  const lobbySlot3Ready = lobbyGameMode === 'trio'
+    ? (assignedRole === 'guest2' ? isReady : (lobbyGuestReady['guest2' as PlayerId] === true))
+    : true
+
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-green-950 gap-8">
       <h1 className="text-3xl font-bold text-white">Join Game</h1>
@@ -344,17 +368,32 @@ export default function Lobby({ peer }: Props) {
 
               <div className="flex flex-col gap-2">
                 <p className="text-gray-400 text-sm text-center mb-1">Players</p>
-                {game.players.map(p => (
-                  <PlayerSlot
-                    key={p.id}
-                    name={game.playerNames[p.id]}
-                    isReady={p.id === 'host' || p.id === assignedRole || p.id === 'bot1' || p.id === 'bot2'}
-                    isYou={p.id === assignedRole}
-                  />
-                ))}
+                <PlayerSlot name={lobbyHostName} isReady />
+                <PlayerSlot name={lobbySlot2Name} isReady={lobbySlot2Ready} isYou={assignedRole === 'guest'} />
+                <PlayerSlot name={lobbySlot3Name} isReady={lobbySlot3Ready} isYou={assignedRole === 'guest2'} />
               </div>
 
-              <div className="text-gray-400 animate-pulse text-sm">Waiting for host to start…</div>
+              <button
+                onClick={() => {
+                  const next = !isReady
+                  setIsReady(next)
+                  sendReady(next)
+                }}
+                className={`px-8 py-3 font-bold rounded-xl text-lg transition-colors ${
+                  isReady
+                    ? 'bg-gray-600 hover:bg-gray-500 text-white'
+                    : 'bg-green-600 hover:bg-green-500 text-white'
+                }`}
+              >
+                {isReady ? 'Not Ready' : 'Ready'}
+              </button>
+
+              {!isReady && (
+                <div className="text-gray-400 animate-pulse text-sm">Waiting for host to start…</div>
+              )}
+              {isReady && (
+                <div className="text-gray-400 text-sm">Waiting for host to start…</div>
+              )}
             </>
           )}
         </div>
@@ -373,7 +412,7 @@ export default function Lobby({ peer }: Props) {
       ) : null}
 
       <button
-        onClick={() => setView('home')}
+        onClick={() => { setIsReady(false); setView('home') }}
         className="text-gray-500 hover:text-gray-300 text-sm underline"
       >
         Back

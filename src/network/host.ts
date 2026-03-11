@@ -1,13 +1,19 @@
 import Peer, { type DataConnection } from 'peerjs'
 import type { NetworkMessage } from './types'
-import type { GameState, GameAction, PlayerId } from '../game/engine'
+import type { GameState, GameAction, PlayerId, GameMode } from '../game/engine'
 import { generateRoomCode, peerIdFromCode, codeFromPeerId } from './roomCode'
 
 export type HostCallbacks = {
   onRoomCode: (code: string) => void
-  onGuestConnected: (playerId: PlayerId, name: string, sendSnapshot: (state: GameState) => void) => void
+  onGuestConnected: (
+    playerId: PlayerId,
+    name: string,
+    sendSnapshot: (state: GameState) => void,
+    sendLobbySnapshot: (gameMode: GameMode, hostName: string, guestNames: Partial<Record<PlayerId, string>>, guestReady: Partial<Record<PlayerId, boolean>>) => void
+  ) => void
   onGuestDisconnected: (playerId: PlayerId) => void
   onActionIntent: (action: GameAction, fromPlayerId: PlayerId) => void
+  onGuestReadyChange?: (playerId: PlayerId, ready: boolean) => void
   onError?: (type: string) => void
 }
 
@@ -56,10 +62,23 @@ export class GameHost {
           // Send the player their assigned slot
           const assignment: NetworkMessage = { type: 'PLAYER_ASSIGNMENT', playerId: assignedId }
           if (conn.open) conn.send(assignment)
-          this.callbacks.onGuestConnected(assignedId, msg.name, (state: GameState) => {
-            const snapshot: NetworkMessage = { type: 'STATE_SNAPSHOT', state }
-            if (conn.open) conn.send(snapshot)
-          })
+          this.callbacks.onGuestConnected(
+            assignedId,
+            msg.name,
+            (state: GameState) => {
+              const snapshot: NetworkMessage = { type: 'STATE_SNAPSHOT', state }
+              if (conn.open) conn.send(snapshot)
+            },
+            (gameMode: GameMode, hostName: string, guestNames: Partial<Record<PlayerId, string>>, guestReady: Partial<Record<PlayerId, boolean>>) => {
+              const snapshot: NetworkMessage = { type: 'LOBBY_SNAPSHOT', gameMode, hostName, guestNames, guestReady }
+              if (conn.open) conn.send(snapshot)
+            }
+          )
+        } else if (msg.type === 'GUEST_READY') {
+          const fromPlayerId = this.connToPlayer.get(conn)
+          if (fromPlayerId) {
+            this.callbacks.onGuestReadyChange?.(fromPlayerId, msg.ready)
+          }
         } else if (msg.type === 'ACTION_INTENT') {
           const fromPlayerId = this.connToPlayer.get(conn)
           if (fromPlayerId) {
@@ -81,6 +100,13 @@ export class GameHost {
 
   broadcastSnapshot(state: GameState) {
     const msg: NetworkMessage = { type: 'STATE_SNAPSHOT', state }
+    for (const conn of this.connections) {
+      if (conn.open) conn.send(msg)
+    }
+  }
+
+  broadcastLobbySnapshot(gameMode: GameMode, hostName: string, guestNames: Partial<Record<PlayerId, string>>, guestReady: Partial<Record<PlayerId, boolean>>) {
+    const msg: NetworkMessage = { type: 'LOBBY_SNAPSHOT', gameMode, hostName, guestNames, guestReady }
     for (const conn of this.connections) {
       if (conn.open) conn.send(msg)
     }

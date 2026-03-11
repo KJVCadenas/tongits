@@ -9,6 +9,7 @@ import {
   selectDealer,
 } from './engine'
 import type { GameState, PlayerId } from './engine'
+import type { NetworkMessage } from '../network/types'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -2405,5 +2406,96 @@ describe('TC-MODE-GAMEMODE-PRESERVED — gameMode preserved across VOTE_NEXT_ROU
     expect(afterHost.phase).toBe('ROUND_END') // guest hasn't voted yet
     const afterGuest = gameReducer(afterHost, { type: 'VOTE_NEXT_ROUND', playerId: 'guest' })
     expect(afterGuest.gameMode).toBe('duo')
+  })
+})
+
+// ─── Network Message Shapes ───────────────────────────────────────────────────
+
+describe('TC-NET-1 — LOBBY_SNAPSHOT message shape', () => {
+  it('constructs a valid LOBBY_SNAPSHOT message with all required fields', () => {
+    const msg: NetworkMessage = {
+      type: 'LOBBY_SNAPSHOT',
+      gameMode: 'duo',
+      hostName: 'Kurt',
+      guestNames: { guest: 'Joy' },
+      guestReady: { guest: false },
+    }
+    expect(msg.type).toBe('LOBBY_SNAPSHOT')
+    expect(msg.gameMode).toBe('duo')
+    expect(msg.hostName).toBe('Kurt')
+    expect(msg.guestNames).toEqual({ guest: 'Joy' })
+    expect(msg.guestReady).toEqual({ guest: false })
+  })
+
+  it('allows empty guestNames and guestReady for a freshly opened room', () => {
+    const msg: NetworkMessage = {
+      type: 'LOBBY_SNAPSHOT',
+      gameMode: 'trio',
+      hostName: 'Alice',
+      guestNames: {},
+      guestReady: {},
+    }
+    expect(msg.guestNames).toEqual({})
+    expect(msg.guestReady).toEqual({})
+  })
+})
+
+describe('TC-NET-2 — GUEST_READY message shape', () => {
+  it('constructs a ready=true message', () => {
+    const msg: NetworkMessage = { type: 'GUEST_READY', playerId: 'guest', ready: true }
+    expect(msg.type).toBe('GUEST_READY')
+    expect(msg.playerId).toBe('guest')
+    expect(msg.ready).toBe(true)
+  })
+
+  it('constructs a ready=false message', () => {
+    const msg: NetworkMessage = { type: 'GUEST_READY', playerId: 'guest2', ready: false }
+    expect(msg.ready).toBe(false)
+    expect(msg.playerId).toBe('guest2')
+  })
+})
+
+// ─── START_GAME with guestNames ───────────────────────────────────────────────
+
+describe('TC-NET-3 — START_GAME sets guest player name in duo mode', () => {
+  it('merges guestNames into playerNames', () => {
+    const state = gameReducer(initialGameState, {
+      type: 'START_GAME',
+      gameMode: 'duo',
+      hostName: 'Kurt',
+      guestNames: { guest: 'Joy' },
+    })
+    expect(state.playerNames.host).toBe('Kurt')
+    expect(state.playerNames.guest).toBe('Joy')
+    expect(state.playerNames.bot2).toBe('Bot 2')
+  })
+})
+
+describe('TC-NET-4 — START_GAME sets both guest names in trio mode', () => {
+  it('sets host, guest, and guest2 names correctly', () => {
+    const state = gameReducer(initialGameState, {
+      type: 'START_GAME',
+      gameMode: 'trio',
+      hostName: 'Alice',
+      guestNames: { guest: 'Bob', guest2: 'Carol' },
+    })
+    expect(state.playerNames.host).toBe('Alice')
+    expect(state.playerNames.guest).toBe('Bob')
+    expect(state.playerNames.guest2).toBe('Carol')
+    expect(state.gameMode).toBe('trio')
+  })
+})
+
+describe('TC-NET-5 — START_GAME solo mode uses only hostName', () => {
+  it('sets host name and preserves default bot names', () => {
+    const state = gameReducer(initialGameState, {
+      type: 'START_GAME',
+      gameMode: 'solo',
+      hostName: 'Solo Player',
+    })
+    expect(state.playerNames.host).toBe('Solo Player')
+    expect(state.playerNames.bot1).toBe('Bot 1')
+    expect(state.playerNames.bot2).toBe('Bot 2')
+    expect(state.gameMode).toBe('solo')
   })
 })
