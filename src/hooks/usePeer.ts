@@ -88,9 +88,9 @@ export function usePeer() {
         })
       },
       onActionIntent: (action: GameAction, fromPlayerId: PlayerId) => {
-        // Validate it's that player's turn before dispatching
         const currentGame = useGameStore.getState().game
-        if (currentGame.currentTurn === fromPlayerId) {
+        // VOTE_NEXT_ROUND is allowed from any human player during ROUND_END
+        if (action.type === 'VOTE_NEXT_ROUND' || currentGame.currentTurn === fromPlayerId) {
           dispatch(action)
         }
       },
@@ -101,6 +101,9 @@ export function usePeer() {
   }
 
   function joinAsGuest(code: string, name: string) {
+    // Destroy any prior guest instance before creating a new one
+    guestRef.current?.destroy()
+    guestRef.current = null
     setConnectionStatus('connecting')
     const guest = new GameGuest({
       onConnected: () => setConnectionStatus('connected'),

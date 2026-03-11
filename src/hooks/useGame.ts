@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useUIStore } from '../store/uiStore'
-import { detectMelds, findBestDiscard } from '../game/melds'
+import { detectMelds, findBestDiscard, canExtendMeld } from '../game/melds'
 import type { PlayerId, GameAction } from '../game/engine'
 
 export function useGame(sendIntent?: (action: GameAction) => void) {
@@ -171,10 +171,36 @@ export function useGame(sendIntent?: (action: GameAction) => void) {
     // Exclude cards already grouped into pending melds
     const pendingIds = new Set(pendingMeldGroups.flat())
     const freeCards = me.hand.filter(c => !pendingIds.has(c.id))
-    const melds = detectMelds(freeCards)
-    if (melds.length === 0) return
+
+    // Try to extend existing pending groups with free cards
+    const updatedGroups = pendingMeldGroups.map(g => [...g])
+    const remainingFree = [...freeCards]
+    let extended = false
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const group of updatedGroups) {
+        const groupCards = me.hand.filter(c => group.includes(c.id))
+        for (let i = remainingFree.length - 1; i >= 0; i--) {
+          if (canExtendMeld(remainingFree[i], groupCards)) {
+            group.push(remainingFree[i].id)
+            groupCards.push(remainingFree[i])
+            remainingFree.splice(i, 1)
+            extended = true
+            changed = true
+            break
+          }
+        }
+      }
+    }
+
+    // Detect new melds from cards not placed into any existing group
+    const newMelds = detectMelds(remainingFree)
+    if (!extended && newMelds.length === 0) return
+
     clearCardSelection()
-    for (const meld of melds) {
+    if (extended) setPendingMeldGroups(updatedGroups)
+    for (const meld of newMelds) {
       addPendingMeld(meld.map(c => c.id))
     }
   }

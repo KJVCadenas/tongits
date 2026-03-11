@@ -12,13 +12,23 @@ export type GuestCallbacks = {
   onLobbySnapshot: (gameMode: GameMode, hostName: string, guestNames: Partial<Record<PlayerId, string>>, guestReady: Partial<Record<PlayerId, boolean>>) => void
 }
 
+const CONNECTION_TIMEOUT_MS = 15000
+
 export class GameGuest {
   private peer: Peer | null = null
   private conn: DataConnection | null = null
   private callbacks: GuestCallbacks
+  private connectTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(callbacks: GuestCallbacks) {
     this.callbacks = callbacks
+  }
+
+  private clearConnectTimer() {
+    if (this.connectTimer !== null) {
+      clearTimeout(this.connectTimer)
+      this.connectTimer = null
+    }
   }
 
   connect(roomCode: string, name: string) {
@@ -33,7 +43,15 @@ export class GameGuest {
       const conn = this.peer!.connect(fullPeerId)
       this.conn = conn
 
+      // Timeout if the data channel never opens (e.g. NAT traversal failure)
+      this.connectTimer = setTimeout(() => {
+        this.connectTimer = null
+        this.destroy()
+        this.callbacks.onError()
+      }, CONNECTION_TIMEOUT_MS)
+
       conn.on('open', () => {
+        this.clearConnectTimer()
         // Immediately send our name so host can assign us a slot
         const msg: NetworkMessage = { type: 'PLAYER_JOIN', name }
         conn.send(msg)
@@ -56,11 +74,13 @@ export class GameGuest {
       })
 
       conn.on('error', () => {
+        this.clearConnectTimer()
         this.callbacks.onError()
       })
     })
 
     this.peer.on('error', () => {
+      this.clearConnectTimer()
       this.callbacks.onError()
     })
   }
@@ -80,6 +100,7 @@ export class GameGuest {
   }
 
   destroy() {
+    this.clearConnectTimer()
     this.peer?.destroy()
     this.peer = null
     this.conn = null

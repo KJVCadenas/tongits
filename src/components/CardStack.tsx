@@ -22,13 +22,13 @@ export default function CardStack({ count, label, isActive = false }: Props) {
           <motion.span
             key={count}
             initial={{ scale: 1.4, color: '#facc15', opacity: 0.8 }}
-            animate={{ scale: 1, color: '#ffffff', opacity: 1 }}
+            animate={{ scale: 1, color: isActive ? '#facc15' : '#ffffff', opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0, transition: { duration: 0.1 } }}
             transition={{ duration: 0.3 }}
-            className="bg-gray-800 text-xs font-bold px-2 py-0.5 rounded-full leading-none"
+            className={`text-sm font-bold px-2.5 py-1 rounded-full leading-none ${isActive ? 'bg-yellow-500/30 text-yellow-300' : 'bg-gray-800 text-white'}`}
             data-testid={`card-count-${label}`}
           >
-            {count}
+            {count} cards
           </motion.span>
         </AnimatePresence>
       </div>
